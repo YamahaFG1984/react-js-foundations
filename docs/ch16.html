@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数据获取与持久化 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html" class="on" aria-current="page"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html" class="on" aria-current="page"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch16">
+  <div class="ch__num">Chapter 16</div>
+  <h2>数据获取与持久化</h2>
+  <p class="ch__sub">原书这一章的取数代码藏着一个所有人都会踩的 bug：请求竞态。修好它需要的正是第 11 章那个清理函数。</p>
+  <div class="ch__files">chapter16/Restful.js · Restful2.js · Clicker1–4.js · chapter11/ShippingAddress.js · WeatherWidget.js</div>
+
+  <h3>先看清竞态问题</h3>
+  <p>原书 <code>ShippingAddress.js</code> 在 <code>useEffect</code> 里按邮编取数，没有任何清理。
+  用户手快连输两个邮编时，会发生这件事：</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 350" role="img" aria-label="没有清理时先发出的慢请求会在后发出的快请求之后返回并覆盖正确结果；在 effect 清理函数中中止或忽略过期请求即可修复">
+      <text x="15" y="22" class="ttl af">没有清理：后发的先回，先发的后回，界面被改回旧结果</text>
+      <line x1="150" y1="34" x2="870" y2="34" class="ln-soft"/>
+      <text x="150" y="28" class="lbl">时间 →</text>
+
+      <text x="15" y="70" class="sm">请求 A（"lo"）</text>
+      <rect x="150" y="58" width="500" height="14" rx="7" class="box-p"/>
+      <circle cx="150" cy="65" r="5" class="ms" fill="none"/>
+      <circle cx="650" cy="65" r="5" class="af"/>
+      <text x="666" y="69" class="sm af">A 返回 → setState("lo 的结果")</text>
+
+      <text x="15" y="106" class="sm">请求 B（"lon"）</text>
+      <rect x="300" y="94" width="170" height="14" rx="7" class="box-r"/>
+      <circle cx="300" cy="101" r="5" class="ms" fill="none"/>
+      <circle cx="470" cy="101" r="5" class="rf"/>
+      <text x="486" y="105" class="sm">B 返回 → setState("lon 的结果")</text>
+
+      <line x1="470" y1="118" x2="470" y2="140" class="ln-soft dash"/>
+      <line x1="650" y1="78" x2="650" y2="140" class="ln-soft dash"/>
+      <text x="150" y="158" class="lbl">界面：</text>
+      <rect x="200" y="144" width="270" height="22" rx="2" class="box-v"/>
+      <text x="335" y="159" text-anchor="middle" class="sm">正确（lon）</text>
+      <rect x="470" y="144" width="270" height="22" rx="2" class="box-a"/>
+      <text x="605" y="159" text-anchor="middle" class="sm">被覆盖成过期结果（lo）</text>
+
+      <line x1="15" y1="186" x2="885" y2="186" class="ln-soft dash"/>
+
+      <text x="15" y="212" class="ttl vf">加上清理：邮编一变，就先把上一个请求作废</text>
+      <line x1="150" y1="224" x2="870" y2="224" class="ln-soft"/>
+
+      <text x="15" y="260" class="sm">请求 A（"lo"）</text>
+      <rect x="150" y="248" width="150" height="14" rx="7" class="box-p"/>
+      <circle cx="150" cy="255" r="5" class="ms" fill="none"/>
+      <line x1="294" y1="243" x2="306" y2="267" class="ln a"/>
+      <line x1="306" y1="243" x2="294" y2="267" class="ln a"/>
+      <text x="316" y="259" class="sm af">cleanup 触发 abort，A 的结果永远不会被写入</text>
+
+      <text x="15" y="296" class="sm">请求 B（"lon"）</text>
+      <rect x="300" y="284" width="170" height="14" rx="7" class="box-v"/>
+      <circle cx="300" cy="291" r="5" class="ms" fill="none"/>
+      <circle cx="470" cy="291" r="5" class="vf"/>
+      <text x="486" y="295" class="sm">B 返回 → 界面停在正确结果</text>
+
+      <text x="15" y="336" class="lbl">同样的清理时机（依赖变化前 + 卸载时），既解决了第 4 章的定时器泄漏，也解决了这里的请求竞态——它们是同一个机制。</text>
+    </svg>
+    <figcaption>竞态不是小概率事件：搜索框每敲一个字符就发一个请求时，它几乎必然发生。清理函数是 React 给出的标准答案。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · 正确的取数写法</div>
+<pre><code class="language-typescript">import { useEffect, useState } from "react";
+
+type Repo = { id: number; name: string };
+
+export default function Repos({ user }: { user: string }) {
+  const [repos, setRepos] = useState&lt;Repo[]&gt;([]);
+  const [status, setStatus] =
+    useState&lt;"idle" | "loading" | "error"&gt;("idle");
+
+  useEffect(() =&gt; {
+    const ctrl = new AbortController();
+    setStatus("loading");
+
+    fetch(`https://api.github.com/users/${user}/repos`,
+          { signal: ctrl.signal })
+      .then((r) =&gt; {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+      .then((data: Repo[]) =&gt; { setRepos(data); setStatus("idle"); })
+      .catch((e) =&gt; {
+        if (e.name !== "AbortError") setStatus("error");
+      });
+
+    return () =&gt; ctrl.abort();   // ← 关键的一行
+  }, [user]);
+
+  if (status === "loading") return &lt;p&gt;Loading…&lt;/p&gt;;
+  if (status === "error") return &lt;p&gt;加载失败，请重试&lt;/p&gt;;
+  return &lt;ul&gt;{repos.map((r) =&gt;
+    &lt;li key={r.id}&gt;{r.name}&lt;/li&gt;)}&lt;/ul&gt;;
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · 同样的逻辑</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref, watch, onWatcherCleanup, toRef } from "vue";
+
+type Repo = { id: number; name: string };
+const props = defineProps&lt;{ user: string }&gt;();
+
+const repos = ref&lt;Repo[]&gt;([]);
+const status = ref&lt;"idle" | "loading" | "error"&gt;("idle");
+
+watch(toRef(props, "user"), async (user) =&gt; {
+  const ctrl = new AbortController();
+  onWatcherCleanup(() =&gt; ctrl.abort());   // ← 同样是关键一行
+  status.value = "loading";
+  try {
+    const r = await fetch(
+      `https://api.github.com/users/${user}/repos`,
+      { signal: ctrl.signal });
+    if (!r.ok) throw new Error(String(r.status));
+    repos.value = await r.json();
+    status.value = "idle";
+  } catch (e: any) {
+    if (e.name !== "AbortError") status.value = "error";
+  }
+}, { immediate: true });
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;p v-if="status === 'loading'"&gt;Loading…&lt;/p&gt;
+  &lt;p v-else-if="status === 'error'"&gt;加载失败，请重试&lt;/p&gt;
+  &lt;ul v-else&gt;
+    &lt;li v-for="r in repos" :key="r.id"&gt;{{ r.name }}&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--new">
+    <b>实践中：别手写这些</b>
+    <p>上面两段代码只解决了竞态，还没处理缓存、去重、重试、焦点重取、离线。
+    生产项目直接用数据层库：React 侧是 <strong>TanStack Query</strong>（原 React Query）或路由的 <code>loader</code>；
+    Vue 侧是 <strong>TanStack Query 的 Vue 版</strong>或 <code>@vueuse/core</code> 的 <code>useFetch</code>。
+    原书用的 <code>axios-hooks</code> 已经很少见了。</p>
+  </div>
+
+  <h3>localStorage：原书 Clicker 系列的坑</h3>
+  <p><code>Clicker3.js</code> 写的是 <code>useState(Number(localStorage.getItem("counter")) || 0)</code>。
+  这行代码在<strong>每一次渲染</strong>都会读一次 localStorage——虽然只有第一次的返回值被采纳，但同步的磁盘读取白白执行了。
+  正确写法是传函数（惰性初始化）：</p>
+
+  <pre><code class="language-typescript">// ❌ 每次渲染都执行 getItem
+const [count, setCount] = useState(Number(localStorage.getItem("counter")) || 0);
+
+// ✅ 只在首次挂载时执行一次
+const [count, setCount] = useState(() =&gt; {
+  try {
+    return Number(localStorage.getItem("counter")) || 0;
+  } catch {
+    return 0;   // 隐私模式下 localStorage 可能直接抛异常
+  }
+});
+
+useEffect(() =&gt; {
+  localStorage.setItem("counter", String(count));
+}, [count]);</code></pre>
+
+  <p>Vue 侧对应的是 <code>@vueuse/core</code> 的 <code>useLocalStorage("counter", 0)</code>——一行搞定读写同步，
+  而且跨标签页也会同步。React 侧要做到跨标签页同步，需要 <code>useSyncExternalStore</code> 订阅 <code>storage</code> 事件。</p>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>effect 里取数必须在清理函数中 <code>abort</code> 或设置忽略标志，否则会有竞态。</li>
+      <li><code>useState(fn)</code> 传函数才是惰性初始化，传值会每次渲染都计算。</li>
+      <li>真实项目用 TanStack Query 一类的数据层，别手写缓存与重试。</li>
+      <li>React Router 7 的 <code>loader</code> 能把取数提前到导航阶段，避免加载闪烁。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch15.html"><small>← 上一篇</small>工具链：webpack → Vite</a>
+  <a class="next" href="ch17.html"><small>下一篇 →</small>Context 穿透组件树</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

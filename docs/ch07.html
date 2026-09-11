@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>合成事件与委托 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html" class="on" aria-current="page"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html" class="on" aria-current="page"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch07">
+  <div class="ch__num">Chapter 07</div>
+  <h2>合成事件与委托</h2>
+  <p class="ch__sub">你写了 1000 个 <code>onClick</code>，浏览器上却只装了极少数几个真实监听器。这一层抽象解释了 React 事件的所有"怪脾气"。</p>
+  <div class="ch__files">chapter07/EventProps.js · EventObject.js · WarningButton.js · ColorWheel*.js · CoffeeMachine.js</div>
+
+  <h3>原书清单在做什么</h3>
+  <p><code>EventProps.js</code> 让你打开控制台看 <code>SyntheticBaseEvent</code> 长什么样；四个 <code>ColorWheel</code> 版本演示了 class 里
+  <code>this</code> 的四种绑定写法（构造函数 bind / 行内 bind / 箭头函数属性 / class field）。
+  函数组件把后一半问题整个消掉了，但<strong>合成事件本身依然存在</strong>。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 400" role="img" aria-label="React 在根容器上安装少量真实监听器，原生事件冒泡到根后，React 查找 Fiber 树收集祖先链上的处理函数并用合成事件依次调用">
+      <text x="25" y="24" class="ttl">真实 DOM</text>
+      <rect x="25" y="36" width="240" height="150" rx="2" class="box-p"/>
+      <text x="37" y="54" class="sm m">#root　（React 在这里装监听器）</text>
+      <rect x="45" y="64" width="200" height="110" rx="2" class="box-p"/>
+      <text x="57" y="82" class="sm m">&lt;div&gt;</text>
+      <rect x="65" y="94" width="160" height="66" rx="2" class="box-a"/>
+      <text x="145" y="122" text-anchor="middle" class="sm">&lt;button&gt;</text>
+      <circle cx="145" cy="142" r="6" class="af"/>
+      <text x="145" y="160" text-anchor="middle" class="sm af">用户点击</text>
+
+      <path d="M231 128 L231 50" class="ln a"/>
+      <polygon points="227,50 235,50 231,42" class="af"/>
+      <text x="240" y="96" class="lbl af">原生冒泡</text>
+
+      <line x1="265" y1="44" x2="302" y2="44" class="ln a"/>
+      <polygon points="302,40 302,48 310,44" class="af"/>
+
+      <rect x="310" y="24" width="290" height="46" rx="2" class="box-r"/>
+      <text x="325" y="43" class="sm">① root 上唯一的委托监听器</text>
+      <text x="325" y="61" class="sm m">不管你写了几个 onClick，只装这一个</text>
+
+      <line x1="455" y1="70" x2="455" y2="94" class="ln r"/>
+      <polygon points="451,94 459,94 455,102" class="rf"/>
+
+      <rect x="310" y="102" width="290" height="46" rx="2" class="box-r"/>
+      <text x="325" y="121" class="sm">② 这个 DOM 节点属于哪个 Fiber？</text>
+      <text x="325" y="139" class="sm m">节点上存着指向 Fiber 的内部引用</text>
+
+      <line x1="455" y1="148" x2="455" y2="172" class="ln r"/>
+      <polygon points="451,172 459,172 455,180" class="rf"/>
+
+      <rect x="310" y="180" width="290" height="46" rx="2" class="box-r"/>
+      <text x="325" y="199" class="sm">③ 沿 Fiber 祖先链收集 onClick</text>
+      <text x="325" y="217" class="sm m">收集的是 React 树，不是 DOM 树</text>
+
+      <line x1="455" y1="226" x2="455" y2="250" class="ln r"/>
+      <polygon points="451,250 459,250 455,258" class="rf"/>
+
+      <rect x="310" y="258" width="290" height="46" rx="2" class="box-a"/>
+      <text x="325" y="277" class="sm">④ 造一个 SyntheticEvent，依次调用</text>
+      <text x="325" y="295" class="sm m">先捕获阶段，后冒泡阶段，跨浏览器一致</text>
+
+      <rect x="620" y="24" width="265" height="124" rx="2" class="box-p"/>
+      <text x="634" y="44" class="ttl">这样设计换来了什么</text>
+      <text x="634" y="66" class="sm">· 监听器数量与组件数量解耦</text>
+      <text x="634" y="86" class="sm">· 事件对象的行为跨浏览器一致</text>
+      <text x="634" y="106" class="sm">· 卸载组件时不必手动解绑</text>
+      <text x="634" y="126" class="sm">· 能和并发渲染的优先级配合</text>
+
+      <rect x="620" y="180" width="265" height="124" rx="2" class="box-v"/>
+      <text x="634" y="200" class="ttl">Vue 的做法</text>
+      <text x="634" y="222" class="sm">@click 直接 addEventListener</text>
+      <text x="634" y="242" class="sm">到那个真实元素上。</text>
+      <text x="634" y="266" class="sm m">.stop / .prevent / .once 等修饰符</text>
+      <text x="634" y="284" class="sm m">由编译器生成包装函数。</text>
+
+      <line x1="25" y1="330" x2="885" y2="330" class="ln-soft dash"/>
+      <text x="25" y="354" class="lbl">推论一：e.stopPropagation() 阻止的是<tspan class="af">合成事件在 React 树上</tspan>的传播，不影响 root 之外的原生监听器。</text>
+      <text x="25" y="374" class="lbl">推论二：React 事件的处理时机<tspan class="af">晚于</tspan>直接绑在子元素上的原生监听器——两者混用时顺序常常出人意料。</text>
+      <text x="25" y="394" class="lbl">推论三：Portal 渲染到别处的节点，事件依然沿<tspan class="af">React 树</tspan>冒泡回父组件（见第 18 章）。</text>
+    </svg>
+    <figcaption>关键一句：React 的事件传播走的是 <strong>组件树</strong>，不是 DOM 树。第 18 章的 Portal 之所以"人在外面、事件还在家里"，全靠这一点。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · ColorWheel.tsx</div>
+<pre><code class="language-typescript">import { useState, type ChangeEvent } from "react";
+
+export default function ColorWheel() {
+  const [color, setColor] = useState("#ff0000");
+
+  // 函数组件里没有 this，也就没有 bind 问题
+  function changeColor(e: ChangeEvent&lt;HTMLInputElement&gt;) {
+    setColor(e.target.value);
+  }
+
+  return (
+    &lt;&gt;
+      &lt;div style={{
+        width: 200, height: 200, borderRadius: "50%",
+        backgroundColor: color,
+      }} /&gt;
+      &lt;input value={color} onChange={changeColor} /&gt;
+
+      {/* 阻止默认行为：手动调用，没有修饰符 */}
+      &lt;a href="/x" onClick={(e) =&gt; e.preventDefault()}&gt;不跳转&lt;/a&gt;
+    &lt;/&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · ColorWheel.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref, computed } from "vue";
+
+const color = ref("#ff0000");
+const wheel = computed(() =&gt; ({
+  width: "200px", height: "200px",
+  borderRadius: "50%", backgroundColor: color.value,
+}));
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div :style="wheel" /&gt;
+  &lt;input v-model="color" /&gt;
+
+  &lt;!-- 阻止默认行为：修饰符，编译器生成包装 --&gt;
+  &lt;a href="/x" @click.prevent&gt;不跳转&lt;/a&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th>要做的事</th><th>React</th><th>Vue</th></tr></thead>
+    <tbody>
+      <tr><td>绑定点击</td><td><code>onClick={fn}</code></td><td><code>@click="fn"</code></td></tr>
+      <tr><td>阻止默认</td><td><code>e.preventDefault()</code></td><td><code>@click.prevent</code></td></tr>
+      <tr><td>阻止冒泡</td><td><code>e.stopPropagation()</code></td><td><code>@click.stop</code></td></tr>
+      <tr><td>只触发一次</td><td>自己加标志位</td><td><code>@click.once</code></td></tr>
+      <tr><td>捕获阶段</td><td><code>onClickCapture</code></td><td><code>@click.capture</code></td></tr>
+      <tr><td>特定按键</td><td><code>if (e.key === "Enter")</code></td><td><code>@keyup.enter</code></td></tr>
+      <tr><td>传额外参数</td><td><code>onClick={() =&gt; fn(id)}</code></td><td><code>@click="fn(id)"</code></td></tr>
+      <tr><td>拿到原生事件</td><td><code>e.nativeEvent</code></td><td>回调参数本身就是原生事件</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>React 把事件委托到根容器；<code>SyntheticEvent</code> 是跨浏览器的包装。</li>
+      <li>事件沿 <strong>React 组件树</strong> 传播，与 DOM 层级可以不一致。</li>
+      <li>函数组件让 class 时代的 <code>this</code> 绑定问题彻底消失。</li>
+      <li>Vue 用编译期修饰符做同样的事，写起来更短，但少了"用 JS 表达一切"的一致性。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="sup-identity.html"><small>← 上一篇</small>状态住在树的哪个位置</a>
+  <a class="next" href="ch08.html"><small>下一篇 →</small>受控与非受控表单</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

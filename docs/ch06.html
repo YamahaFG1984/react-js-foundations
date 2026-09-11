@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Props 与 State · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html" class="on" aria-current="page"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html" class="on" aria-current="page"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch06">
+  <div class="ch__num">Chapter 06</div>
+  <h2>Props 与 State</h2>
+  <p class="ch__sub">全书最重要的一章。原书那几个"计数器加两次却只加了一"的例子，暴露的是 React 最反直觉、也最核心的设计：状态是渲染的快照。</p>
+  <div class="ch__files">chapter06/IncrementTwice.js · IncrementTwiceFixed.js · CounterClass3.js · CounterClass4.js · StoresNearYou*.js · Reminders/ · WelcomeMessage.js</div>
+
+  <h3>规则一：props 只读，state 私有</h3>
+  <div class="tw"><table>
+    <thead><tr><th></th><th>props</th><th>state</th></tr></thead>
+    <tbody>
+      <tr><td>谁给的</td><td>父组件</td><td>组件自己</td></tr>
+      <tr><td>能不能改</td><td>不能。组件内改 props 是未定义行为</td><td>只能通过 setter 改</td></tr>
+      <tr><td>改了会怎样</td><td>父组件重新传入新值 → 本组件重渲染</td><td>触发本组件（及其子树）重渲染</td></tr>
+      <tr><td>Vue 对应</td><td><code>defineProps</code>，同样只读</td><td><code>ref</code> / <code>reactive</code>，可直接改</td></tr>
+    </tbody>
+  </table></div>
+  <p>原书 <code>StoresNearYou.js</code> 一路演进到 <code>StoresNearYou8.js</code>，讲的是默认值该写在哪。
+  今天答案很简单：<strong>解构时给默认值</strong>——<code>defaultProps</code> 在 React 19 已对函数组件失效。</p>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · StoresNearYou.tsx</div>
+<pre><code class="language-typescript">type Props = {
+  latitude?: string;
+  longitude?: string;
+};
+
+// 默认值直接写在解构里，替代 defaultProps
+export default function StoresNearYou({
+  latitude = "37.3230",
+  longitude = "122.0322",
+}: Props) {
+  return (
+    &lt;&gt;
+      &lt;div id="map-container"&gt;
+        &lt;Map latitude={latitude} longitude={longitude} /&gt;
+      &lt;/div&gt;
+      &lt;div id="store-list"&gt;
+        &lt;StoreList latitude={latitude} longitude={longitude} /&gt;
+      &lt;/div&gt;
+    &lt;/&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · StoresNearYou.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+// withDefaults 的现代等价：解构 props 并给默认值
+// （Vue 3.5+ 的响应式 props 解构）
+const { latitude = "37.3230", longitude = "122.0322" }
+  = defineProps&lt;{
+      latitude?: string;
+      longitude?: string;
+    }&gt;();
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div id="map-container"&gt;
+    &lt;Map :latitude="latitude" :longitude="longitude" /&gt;
+  &lt;/div&gt;
+  &lt;div id="store-list"&gt;
+    &lt;StoreList :latitude="latitude" :longitude="longitude" /&gt;
+  &lt;/div&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--new">
+    <b>PropTypes 已经没用了</b>
+    <p>原书 <code>WelcomeMessage.js</code>、<code>Contact.js</code>、<code>DisplayPrimaryColors.js</code> 大量使用 <code>prop-types</code>。
+    React 19 已经<strong>移除</strong>了对 <code>Component.propTypes</code> 的读取——写了不报错，但也不校验。
+    对照表：<code>PropTypes.string</code> → <code>string</code>；<code>.isRequired</code> → 去掉 <code>?</code>；
+    <code>PropTypes.oneOf(["red","green"])</code> → <code>"red" | "green"</code>；
+    <code>PropTypes.node</code> → <code>ReactNode</code>；<code>PropTypes.element</code> → <code>ReactElement</code>；
+    <code>PropTypes.func</code> → 写出完整函数签名。类型检查从运行时挪到了编译期，而且更准。</p>
+  </div>
+
+  <h3>规则二：状态住在哪，决定了数据往哪流</h3>
+  <p>原书的 <code>SearchBox</code>（第 3、8 章都出现）是最小的"状态提升"样本：两个兄弟组件要共享一个搜索词，
+  于是搜索词被提到它们最近的公共父级。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 340" role="img" aria-label="状态存放在最近的公共父组件中，数据通过 props 向下流动，子组件通过回调函数向上通知父组件更新状态">
+      <rect x="315" y="30" width="270" height="72" rx="2" class="box-a"/>
+      <text x="450" y="55" text-anchor="middle" class="ttl">SearchBox</text>
+      <text x="450" y="76" text-anchor="middle" class="sm">const [term, setTerm]</text>
+      <text x="450" y="93" text-anchor="middle" class="sm">= useState("")</text>
+      <text x="600" y="60" class="lbl">唯一的真相来源</text>
+      <text x="600" y="78" class="lbl">(single source of truth)</text>
+
+      <path d="M360 102 L360 150 L215 150 L215 196" class="ln r"/>
+      <polygon points="211,196 219,196 215,204" class="rf"/>
+      <text x="222" y="144" class="lbl">term={term}</text>
+      <text x="222" y="162" class="lbl">数据下行</text>
+
+      <path d="M270 204 L270 172 L420 172 L420 104" class="ln a"/>
+      <polygon points="416,104 424,104 420,96" class="af"/>
+      <text x="430" y="134" class="lbl af">onChange(v)</text>
+      <text x="430" y="152" class="lbl af">事件上行</text>
+
+      <path d="M540 102 L540 150 L685 150 L685 196" class="ln r"/>
+      <polygon points="681,196 689,196 685,204" class="rf"/>
+      <text x="556" y="144" class="lbl">term={term}</text>
+
+      <rect x="105" y="204" width="220" height="64" rx="2" class="box-r"/>
+      <text x="215" y="228" text-anchor="middle" class="ttl">SearchInput</text>
+      <text x="215" y="250" text-anchor="middle" class="sm">显示 term，产生事件</text>
+
+      <rect x="575" y="204" width="220" height="64" rx="2" class="box-r"/>
+      <text x="685" y="228" text-anchor="middle" class="ttl">SearchResults</text>
+      <text x="685" y="250" text-anchor="middle" class="sm">只读，纯展示</text>
+
+      <line x1="325" y1="236" x2="565" y2="236" class="ln-soft dot"/>
+      <text x="445" y="230" text-anchor="middle" class="lbl">兄弟之间没有直连通道</text>
+
+      <line x1="15" y1="290" x2="885" y2="290" class="ln-soft dash"/>
+      <text x="15" y="314" class="lbl">React：靠回调函数上行（onChange、setTerm 本身也能直接当 prop 传）。</text>
+      <text x="15" y="332" class="lbl">Vue：靠 emit 上行（defineEmits），或 v-model 把"下行 prop + 上行事件"打包成一个语法糖。</text>
+    </svg>
+    <figcaption>数据只往下流，通知只往上传。要让两个组件共享状态，就把状态搬到它们最近的公共祖先——这条规则在 React 和 Vue 里完全一致。</figcaption>
+  </figure>
+
+  <h3>规则三：状态是这一次渲染的快照</h3>
+  <p>原书 <code>IncrementTwice.js</code> 里，点一次按钮调用了两次 <code>setState({count: this.state.count + 1})</code>，
+  结果 count 只增加了 <strong>1</strong>。<code>IncrementTwiceFixed.js</code> 换成函数式更新后才变成 2。
+  同样地，<code>SetStateAsync.js</code> 在 <code>setState</code> 之后立刻 <code>console.log</code>，打印的是<strong>旧值</strong>。
+  这两个现象是同一件事：</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 430" role="img" aria-label="React 中直接使用状态值更新会因为闭包快照导致两次更新合并为一次，改用函数式更新则会依次应用；Vue 的 ref 读取的是容器当前值因此不存在此问题">
+      <rect x="15" y="26" width="870" height="52" rx="2" class="box-p"/>
+      <text x="30" y="48" class="sm">第 1 次渲染时：const [count, setCount] = useState(0)　→　在这次渲染的作用域里，<tspan class="af">count 就是常量 0</tspan></text>
+      <text x="30" y="68" class="sm m">handleClick 是这次渲染新建的函数，它的闭包里捕获的 count 永远是 0，直到下一次渲染产生一个新的 handleClick。</text>
+
+      <text x="15" y="106" class="ttl">现在点一次按钮，三种写法：</text>
+
+      <rect x="15" y="120" width="280" height="46" rx="2" class="box"/>
+      <text x="28" y="142" class="sm">setCount(count + 1);</text>
+      <text x="28" y="159" class="sm">setCount(count + 1);</text>
+      <line x1="155" y1="166" x2="155" y2="190" class="ln ms"/>
+      <polygon points="151,190 159,190 155,198" class="m"/>
+
+      <rect x="310" y="120" width="280" height="46" rx="2" class="box"/>
+      <text x="323" y="142" class="sm">setCount(c =&gt; c + 1);</text>
+      <text x="323" y="159" class="sm">setCount(c =&gt; c + 1);</text>
+      <line x1="450" y1="166" x2="450" y2="190" class="ln ms"/>
+      <polygon points="446,190 454,190 450,198" class="m"/>
+
+      <rect x="605" y="120" width="280" height="46" rx="2" class="box"/>
+      <text x="618" y="142" class="sm">count.value++;</text>
+      <text x="618" y="159" class="sm">count.value++;　<tspan class="vf">（Vue）</tspan></text>
+      <line x1="745" y1="166" x2="745" y2="190" class="ln ms"/>
+      <polygon points="741,190 749,190 745,198" class="m"/>
+
+      <rect x="15" y="198" width="280" height="92" rx="2" class="box-p"/>
+      <text x="28" y="220" class="lbl">进入更新队列：</text>
+      <text x="28" y="242" class="sm">[ 替换为 1 , 替换为 1 ]</text>
+      <text x="28" y="266" class="sm m">两次都算的 0 + 1，</text>
+      <text x="28" y="283" class="sm m">因为 count 就是 0</text>
+
+      <rect x="310" y="198" width="280" height="92" rx="2" class="box-v"/>
+      <text x="323" y="220" class="lbl">进入更新队列：</text>
+      <text x="323" y="242" class="sm">[ c=&gt;c+1 , c=&gt;c+1 ]</text>
+      <text x="323" y="266" class="sm m">React 依次执行：</text>
+      <text x="323" y="283" class="sm m">0 → 1 → 2</text>
+
+      <rect x="605" y="198" width="280" height="92" rx="2" class="box-v"/>
+      <text x="618" y="220" class="lbl">没有队列：</text>
+      <text x="618" y="242" class="sm">直接写进同一个容器</text>
+      <text x="618" y="266" class="sm m">第二次读到的是刚写</text>
+      <text x="618" y="283" class="sm m">进去的 1</text>
+
+      <line x1="155" y1="290" x2="155" y2="314" class="ln a"/>
+      <polygon points="151,314 159,314 155,322" class="af"/>
+      <line x1="450" y1="290" x2="450" y2="314" class="ln v"/>
+      <polygon points="446,314 454,314 450,322" class="vf"/>
+      <line x1="745" y1="290" x2="745" y2="314" class="ln v"/>
+      <polygon points="741,314 749,314 745,322" class="vf"/>
+
+      <rect x="15" y="322" width="280" height="38" rx="2" class="box-a"/>
+      <text x="155" y="346" text-anchor="middle" class="big">结果：1　（不是 2）</text>
+      <rect x="310" y="322" width="280" height="38" rx="2" class="box-v"/>
+      <text x="450" y="346" text-anchor="middle" class="big">结果：2</text>
+      <rect x="605" y="322" width="280" height="38" rx="2" class="box-v"/>
+      <text x="745" y="346" text-anchor="middle" class="big">结果：2</text>
+
+      <line x1="15" y1="378" x2="885" y2="378" class="ln-soft dash"/>
+      <text x="15" y="400" class="lbl">同一次事件里的多次 setState 会被<tspan class="af">自动批处理</tspan>：只触发一次重渲染。React 18 起，setTimeout、Promise、原生事件里也批处理。</text>
+      <text x="15" y="420" class="lbl">推论：setCount 之后立刻 console.log(count) 永远打印旧值——不是"异步延迟"，而是这次渲染的 count 本来就不会变。</text>
+    </svg>
+    <figcaption>把 <code>count</code> 理解成"这一帧画面上的数字"，而不是"一个会变的变量"。要基于当前值算新值，就用函数式更新把计算<strong>交给 React 在应用队列时执行</strong>。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · Counter.tsx</div>
+<pre><code class="language-typescript">import { useState } from "react";
+
+export default function Counter() {
+  const [count, setCount] = useState(0);
+
+  function incrementTwice() {
+    // ❌ 只会 +1：两次算的都是同一个 count
+    // setCount(count + 1);
+    // setCount(count + 1);
+
+    // ✅ +2：把"怎么算"交给 React
+    setCount((c) =&gt; c + 1);
+    setCount((c) =&gt; c + 1);
+
+    console.log(count); // 仍是旧值，这是正常的
+  }
+
+  return &lt;button onClick={incrementTwice}&gt;{count}&lt;/button&gt;;
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · Counter.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref, nextTick } from "vue";
+
+const count = ref(0);
+
+async function incrementTwice() {
+  count.value++;
+  count.value++;          // 直接 +2，无需特殊写法
+
+  console.log(count.value);   // 2 —— 读的是容器当前值
+  console.log(document.querySelector("button")?.textContent);
+  // 仍是旧的 —— DOM 还没更新
+
+  await nextTick();       // 等这一轮更新刷进 DOM
+  console.log(document.querySelector("button")?.textContent); // "2"
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;button @click="incrementTwice"&gt;{{ count }}&lt;/button&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--trap">
+    <b>两边都有"异步"，但异步的东西不同</b>
+    <p>Vue 里 <strong>数据是同步的，DOM 更新是异步的</strong>（所以有 <code>nextTick</code>）。
+    React 里 <strong>数据本身在本次渲染中就不会变</strong>（快照），DOM 更新自然也是之后的事。
+    把这两句话记牢，90% 的"为什么我拿到的是旧值"就解释清楚了。</p>
+  </div>
+
+  <h3>不可变更新的常用写法</h3>
+  <p>原书 <code>RemindersClass/App.js</code> 里有一段典型的"改数组中某一项"：</p>
+  <pre><code class="language-typescript">// 改第 index 项的 isComplete —— React 必须造新数组、新对象
+setReminders(reminders.map((r, i) =&gt;
+  i === index ? { ...r, isComplete } : r
+));
+
+// 增：setReminders([...reminders, item]);
+// 删：setReminders(reminders.filter((_, i) =&gt; i !== index));
+// 排序：setReminders([...reminders].sort(cmp));   // 先复制，sort 会改原数组
+
+// 结构很深时，用 useReducer 或者 immer 的 produce()，
+// 别手写五层展开运算符。</code></pre>
+  <p>Vue 对应写法就是 <code>reminders.value[index].isComplete = isComplete</code>——一行。
+  这是两边最直观的体验差异，也是各自设计取舍最集中的地方。</p>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>props 只读；默认值写在解构里；类型交给 TypeScript。</li>
+      <li>状态提升到最近公共父级：数据下行，事件上行。</li>
+      <li><strong>state 是本次渲染的快照</strong>：基于旧值算新值时用 <code>setState(prev =&gt; …)</code>。</li>
+      <li>同一事件内的多次 setState 会批处理，只重渲染一次。</li>
+      <li>React 需要不可变更新，Vue 可以就地修改——这是两者所有差异的根。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch04.html"><small>← 上一篇</small>组件、children 与组合</a>
+  <a class="next" href="sup-identity.html"><small>下一篇 →</small>状态住在树的哪个位置</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

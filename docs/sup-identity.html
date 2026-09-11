@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>状态住在树的哪个位置 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html" class="on" aria-current="page"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html" class="on" aria-current="page"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="sup-identity">
+  <div class="ch__num">补 B · 书里没有</div>
+  <h2>状态住在树的哪个位置</h2>
+  <p class="ch__sub">上一节说 state 是"这次渲染的快照"。那这份数据究竟存在哪？答案不是"存在组件里"——是存在<strong>树中的那个位置</strong>上。</p>
+
+  <p>你写的 <code>Counter</code> 只是一个函数，它被调用一百次就产生一百份独立的 state。区分它们的不是函数本身，
+  而是 React 在树里给它安排的位置：<strong>父节点 + 在同层中的次序 + key</strong>。位置不变，state 就一直在；位置一变，state 就没了。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 430" role="img" aria-label="组件状态由它在树中的位置和 key 决定：同位置改 props 保留状态，同位置改 key 会销毁重建，包上一层容器改变了层级同样会重建">
+      <text x="15" y="26" class="ttl">① 同位置，只改 props</text>
+      <rect x="15" y="36" width="275" height="52" rx="2" class="box-p"/>
+      <text x="28" y="58" class="sm">&lt;Counter user="A" /&gt;</text>
+      <text x="28" y="78" class="sm m">内部 count = 5</text>
+      <line x1="152" y1="88" x2="152" y2="104" class="ln"/>
+      <polygon points="148,104 156,104 152,112" class="hd"/>
+      <rect x="15" y="112" width="275" height="52" rx="2" class="box-p"/>
+      <text x="28" y="134" class="sm">&lt;Counter user="B" /&gt;</text>
+      <text x="28" y="154" class="sm vf">内部 count 仍是 5</text>
+      <rect x="15" y="176" width="275" height="36" rx="2" class="box-v"/>
+      <text x="152" y="199" text-anchor="middle" class="sm">状态保留</text>
+      <text x="15" y="234" class="lbl">位置相同、type 相同、key 相同</text>
+      <text x="15" y="252" class="lbl">→ React 认为还是同一个实例</text>
+
+      <line x1="305" y1="14" x2="305" y2="290" class="ln-soft dash"/>
+
+      <text x="325" y="26" class="ttl">② 同位置，改 key</text>
+      <rect x="325" y="36" width="275" height="52" rx="2" class="box-p"/>
+      <text x="338" y="58" class="sm">&lt;Counter key="A" /&gt;</text>
+      <text x="338" y="78" class="sm m">内部 count = 5</text>
+      <line x1="462" y1="88" x2="462" y2="104" class="ln a"/>
+      <polygon points="458,104 466,104 462,112" class="af"/>
+      <rect x="325" y="112" width="275" height="52" rx="2" class="box-p"/>
+      <text x="338" y="134" class="sm">&lt;Counter key="B" /&gt;</text>
+      <text x="338" y="154" class="sm af">内部 count = 0</text>
+      <rect x="325" y="176" width="275" height="36" rx="2" class="box-a"/>
+      <text x="462" y="199" text-anchor="middle" class="sm">状态被重置</text>
+      <text x="325" y="234" class="lbl">key 变了 = 换了一条数据</text>
+      <text x="325" y="252" class="lbl">→ 卸载旧实例，挂载新实例</text>
+
+      <line x1="615" y1="14" x2="615" y2="290" class="ln-soft dash"/>
+
+      <text x="635" y="26" class="ttl">③ 位置变了</text>
+      <rect x="635" y="36" width="250" height="52" rx="2" class="box-p"/>
+      <text x="648" y="58" class="sm">&lt;Counter /&gt;</text>
+      <text x="648" y="78" class="sm m">直接挂在 App 下</text>
+      <line x1="760" y1="88" x2="760" y2="104" class="ln a"/>
+      <polygon points="756,104 764,104 760,112" class="af"/>
+      <rect x="635" y="112" width="250" height="52" rx="2" class="box-p"/>
+      <text x="648" y="134" class="sm">&lt;div&gt;&lt;Counter /&gt;&lt;/div&gt;</text>
+      <text x="648" y="154" class="sm af">多包了一层，count = 0</text>
+      <rect x="635" y="176" width="250" height="36" rx="2" class="box-a"/>
+      <text x="760" y="199" text-anchor="middle" class="sm">状态被重置</text>
+      <text x="635" y="234" class="lbl">同层比较：这个位置上的</text>
+      <text x="635" y="252" class="lbl">type 从 Counter 变成了 div</text>
+
+      <line x1="15" y1="286" x2="885" y2="286" class="ln-soft dash"/>
+      <text x="15" y="312" class="big">state 不属于你写的那个组件函数，它属于「树中的这个位置 + key」。</text>
+
+      <rect x="15" y="328" width="560" height="70" rx="2" class="box-r"/>
+      <text x="30" y="350" class="sm">于是有了一个很好用的技巧：<tspan class="rf">用 key 主动重置状态</tspan></text>
+      <text x="30" y="372" class="sm">&lt;ProfileForm key={userId} /&gt;　—— 切换用户时表单自动清空，</text>
+      <text x="30" y="392" class="sm">不需要写任何 useEffect 去同步（见「补 C」）</text>
+
+      <rect x="595" y="328" width="290" height="70" rx="2" class="box-v"/>
+      <text x="610" y="350" class="sm">Vue 完全相同：</text>
+      <text x="610" y="372" class="sm">&lt;ProfileForm :key="userId" /&gt;</text>
+      <text x="610" y="392" class="sm m">key 变化会销毁并重建组件实例</text>
+
+      <text x="15" y="422" class="lbl">反过来说：想让状态<tspan class="af">保住</tspan>，就别让它所在的位置和 type 发生变化——这是很多"状态莫名丢失"的真正原因。</text>
+    </svg>
+    <figcaption>把 state 想成挂在树上的一个个挂钩：挂钩由位置和 key 定义。组件函数只是往挂钩上取放东西的人，它自己什么都不存。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React · 用 key 重置，而不是用 effect 同步</div>
+<pre><code class="language-typescript">// ❌ 常见但错误：用 effect 把 props 同步进 state
+function ProfileForm({ userId, initialName }: Props) {
+  const [name, setName] = useState(initialName);
+
+  useEffect(() =&gt; {
+    setName(initialName);      // 换用户时重置
+  }, [userId]);                // 会多渲染一次，还容易漏字段
+
+  return &lt;input value={name}
+    onChange={(e) =&gt; setName(e.target.value)} /&gt;;
+}
+
+// ✅ 让 React 自己重建：换 key 即可
+function ProfileForm({ initialName }: { initialName: string }) {
+  const [name, setName] = useState(initialName);
+  return &lt;input value={name}
+    onChange={(e) =&gt; setName(e.target.value)} /&gt;;
+}
+
+// 父组件
+&lt;ProfileForm key={userId} initialName={user.name} /&gt;
+
+// 一个约定：以 initial / default 开头的 prop，
+// 意思就是"只在初始化时读一次，之后不再跟随"。</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue · 同样的两种写法</div>
+<pre><code class="language-html">&lt;!-- ❌ 用 watch 同步 --&gt;
+&lt;script setup lang="ts"&gt;
+const props = defineProps&lt;Props&gt;();
+const name = ref(props.initialName);
+watch(() =&gt; props.userId, () =&gt; {
+  name.value = props.initialName;
+});
+&lt;/script&gt;
+
+&lt;!-- ✅ 让 key 触发重建 --&gt;
+&lt;script setup lang="ts"&gt;
+const props = defineProps&lt;{ initialName: string }&gt;();
+const name = ref(props.initialName);
+&lt;/script&gt;
+&lt;template&gt;
+  &lt;input v-model="name" /&gt;
+&lt;/template&gt;
+
+&lt;!-- 父组件 --&gt;
+&lt;ProfileForm :key="userId" :initial-name="user.name" /&gt;</code></pre></div>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>state 挂在「树中的位置 + key」上，不挂在组件函数上。</li>
+      <li>同位置换 props → 保留；换 key → 重建；type 变了 → 重建。</li>
+      <li>需要"换数据就清空"时，给组件一个 <code>key</code>，别写 effect 去同步。</li>
+      <li><code>initialXxx</code> 这类命名是在告诉调用者：这个值只读一次。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch06.html"><small>← 上一篇</small>Props 与 State</a>
+  <a class="next" href="ch07.html"><small>下一篇 →</small>合成事件与委托</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

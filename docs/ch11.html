@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hooks 的规则从何而来 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html" class="on" aria-current="page"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html" class="on" aria-current="page"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch11">
+  <div class="ch__num">Chapter 11</div>
+  <h2>Hooks 的规则从何而来</h2>
+  <p class="ch__sub">"只能在顶层调用、不能放进 if 里"——这条规则听起来武断。看一眼 React 内部怎么存 Hook 数据，它就变成了唯一可能的设计。</p>
+  <div class="ch__files">chapter11/NumberGuessing.js · Timer{,Restart,Once,Conditional}Demo.js · ReducerCounter.js · useZipLookup.js · CallMe.js · CallMeFixed.js · CountingBox.js</div>
+
+  <h3>为什么 Hook 不能写在条件里</h3>
+  <p>函数组件没有 <code>this</code>，那 <code>useState</code> 把值存在哪？答案是存在这个组件的 Fiber 节点上，
+  <strong>一个按调用顺序排列的列表</strong>。React 不知道你的变量叫什么，它只知道"这是本次渲染的第几个 Hook"。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 440" role="img" aria-label="React 按调用顺序把 Hook 的数据存进 Fiber 上的槽位列表，两次渲染顺序一致才能取回正确的值；把 Hook 放进条件语句会让调用序号与槽位错位">
+      <text x="15" y="22" class="ttl">正常：两次渲染的调用顺序完全一致</text>
+
+      <rect x="15" y="34" width="272" height="132" rx="2" class="box-p"/>
+      <text x="28" y="56" class="sm">function Form() {</text>
+      <text x="28" y="78" class="sm">&nbsp;&nbsp;const [a, setA] = useState("");</text>
+      <text x="28" y="100" class="sm">&nbsp;&nbsp;const [b, setB] = useState(0);</text>
+      <text x="28" y="122" class="sm">&nbsp;&nbsp;useEffect(fn, [a]);</text>
+      <text x="28" y="144" class="sm">}</text>
+
+      <line x1="287" y1="100" x2="322" y2="100" class="ln r"/>
+      <polygon points="322,96 322,104 330,100" class="rf"/>
+      <text x="288" y="90" class="lbl">按序写入</text>
+
+      <rect x="330" y="34" width="190" height="38" rx="2" class="box-r"/>
+      <text x="343" y="58" class="sm">槽 0 · state ""</text>
+      <rect x="330" y="80" width="190" height="38" rx="2" class="box-r"/>
+      <text x="343" y="104" class="sm">槽 1 · state 0</text>
+      <rect x="330" y="126" width="190" height="38" rx="2" class="box-r"/>
+      <text x="343" y="150" class="sm">槽 2 · effect [a]</text>
+
+      <line x1="520" y1="100" x2="570" y2="100" class="ln"/>
+      <polygon points="570,96 570,104 578,100" class="hd"/>
+      <text x="524" y="90" class="lbl">第 2 次渲染</text>
+
+      <rect x="578" y="34" width="190" height="38" rx="2" class="box-v"/>
+      <text x="591" y="58" class="sm">第 1 个 useState</text>
+      <rect x="578" y="80" width="190" height="38" rx="2" class="box-v"/>
+      <text x="591" y="104" class="sm">第 2 个 useState</text>
+      <rect x="578" y="126" width="190" height="38" rx="2" class="box-v"/>
+      <text x="591" y="150" class="sm">第 1 个 useEffect</text>
+      <text x="782" y="58" class="lbl">→ 槽 0 ✓</text>
+      <text x="782" y="104" class="lbl">→ 槽 1 ✓</text>
+      <text x="782" y="150" class="lbl">→ 槽 2 ✓</text>
+
+      <text x="15" y="192" class="lbl">React 不认识变量名，只认得"这是第几个 Hook"。顺序稳定，取回的就一定是上次那份数据。</text>
+
+      <line x1="15" y1="210" x2="885" y2="210" class="ln-soft dash"/>
+      <text x="15" y="236" class="ttl af">出错：把 Hook 放进条件里，第 2 次少调用一个</text>
+
+      <rect x="15" y="250" width="272" height="132" rx="2" class="box-p"/>
+      <text x="28" y="272" class="sm">function Form() {</text>
+      <text x="28" y="294" class="sm af">&nbsp;&nbsp;if (cond) useState("");</text>
+      <text x="28" y="316" class="sm">&nbsp;&nbsp;const [b] = useState(0);</text>
+      <text x="28" y="338" class="sm">&nbsp;&nbsp;useEffect(fn);</text>
+      <text x="28" y="360" class="sm">}</text>
+      <text x="28" y="378" class="lbl af">第 2 次渲染时 cond 变成了 false</text>
+
+      <rect x="310" y="250" width="222" height="40" rx="2" class="box-a"/>
+      <text x="323" y="275" class="sm">调用 ① useState(0)</text>
+      <rect x="310" y="300" width="222" height="40" rx="2" class="box-a"/>
+      <text x="323" y="325" class="sm">调用 ② useEffect(fn)</text>
+      <text x="310" y="366" class="lbl">本次只有 2 次调用</text>
+
+      <line x1="532" y1="270" x2="592" y2="270" class="ln a"/>
+      <polygon points="592,266 592,274 600,270" class="af"/>
+      <line x1="532" y1="320" x2="592" y2="320" class="ln a"/>
+      <polygon points="592,316 592,324 600,320" class="af"/>
+
+      <rect x="600" y="250" width="222" height="40" rx="2" class="box"/>
+      <text x="613" y="275" class="sm">槽 0 里存着 ""</text>
+      <rect x="600" y="300" width="222" height="40" rx="2" class="box"/>
+      <text x="613" y="325" class="sm">槽 1 里存着 0</text>
+      <rect x="600" y="350" width="222" height="40" rx="2" class="box-p"/>
+      <text x="613" y="375" class="sm m">槽 2 · 无人认领</text>
+
+      <text x="832" y="275" class="lbl af">拿到 ""</text>
+      <text x="832" y="325" class="lbl af">拿到 0</text>
+
+      <text x="15" y="410" class="lbl">结果：<tspan class="af">b 变成了字符串 ""</tspan>，effect 把上次的 state 当成了自己的记录，dev 模式抛出 "Rendered fewer hooks than expected"。</text>
+      <text x="15" y="430" class="lbl">所以规则只有一条：<tspan class="af">每次渲染，Hook 的调用序列必须一模一样</tspan>。想要条件逻辑，就把条件放进 Hook 内部，或者拆成两个组件。</text>
+    </svg>
+    <figcaption>Hook 的"规则"不是约定俗成，而是"用调用顺序当作 key"这个实现方式的必然结果。装个 <code>eslint-plugin-react-hooks</code>，它会替你盯着。</figcaption>
+  </figure>
+
+  <div class="note note--vue">
+    <b>Vue 为什么没有这条规则</b>
+    <p><code>setup()</code> 在组件的一生中<strong>只执行一次</strong>，<code>ref()</code> 创建的对象直接被局部变量持有——不需要"槽位"，
+    自然也就没有顺序要求。你完全可以在 <code>if</code> 里 <code>const x = ref(0)</code>。
+    这一条差异，正是导读那张大图的直接后果。</p>
+  </div>
+
+  <h3>useEffect：什么时候跑，什么时候清理</h3>
+  <p>原书用四个 Timer 例子演示了依赖数组的三种形态（<code>TimerDemo</code> 无第二参数、<code>TimerOnceDemo</code> 传 <code>[]</code>、
+  <code>TimerConditionalDemo</code> 传 <code>[gameNumber]</code>）。把它们放到同一条时间轴上看，规律一目了然：</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 380" role="img" aria-label="三种依赖数组写法在挂载、无关状态更新、依赖变化、卸载四个时刻的执行时机对比">
+      <text x="250" y="26" text-anchor="middle" class="lbl">挂载</text>
+      <text x="430" y="26" text-anchor="middle" class="lbl">setState</text>
+      <text x="430" y="42" text-anchor="middle" class="lbl">(dep 没变)</text>
+      <text x="620" y="26" text-anchor="middle" class="lbl">setState</text>
+      <text x="620" y="42" text-anchor="middle" class="lbl">(dep 变了)</text>
+      <text x="800" y="26" text-anchor="middle" class="lbl">卸载</text>
+
+      <line x1="250" y1="52" x2="250" y2="286" class="ln-soft dash"/>
+      <line x1="430" y1="52" x2="430" y2="286" class="ln-soft dash"/>
+      <line x1="620" y1="52" x2="620" y2="286" class="ln-soft dash"/>
+      <line x1="800" y1="52" x2="800" y2="286" class="ln-soft dash"/>
+
+      <text x="15" y="86" class="sm">useEffect(fn)</text>
+      <text x="15" y="104" class="lbl">TimerRestartDemo</text>
+      <line x1="190" y1="92" x2="870" y2="92" class="ln-soft"/>
+      <circle cx="250" cy="92" r="7" class="rf"/>
+      <text x="250" y="118" text-anchor="middle" class="sm">跑</text>
+      <circle cx="430" cy="92" r="7" class="af"/>
+      <text x="430" y="118" text-anchor="middle" class="sm">清理→跑</text>
+      <circle cx="620" cy="92" r="7" class="af"/>
+      <text x="620" y="118" text-anchor="middle" class="sm">清理→跑</text>
+      <circle cx="800" cy="92" r="7" class="m"/>
+      <text x="800" y="118" text-anchor="middle" class="sm">清理</text>
+
+      <text x="15" y="164" class="sm">useEffect(fn, [])</text>
+      <text x="15" y="182" class="lbl">TimerOnceDemo</text>
+      <line x1="190" y1="170" x2="870" y2="170" class="ln-soft"/>
+      <circle cx="250" cy="170" r="7" class="rf"/>
+      <text x="250" y="196" text-anchor="middle" class="sm">跑</text>
+      <circle cx="430" cy="170" r="4" class="ms" fill="none"/>
+      <text x="430" y="196" text-anchor="middle" class="sm m">—</text>
+      <circle cx="620" cy="170" r="4" class="ms" fill="none"/>
+      <text x="620" y="196" text-anchor="middle" class="sm m">—</text>
+      <circle cx="800" cy="170" r="7" class="m"/>
+      <text x="800" y="196" text-anchor="middle" class="sm">清理</text>
+
+      <text x="15" y="242" class="sm">useEffect(fn, [dep])</text>
+      <text x="15" y="260" class="lbl">TimerConditionalDemo</text>
+      <line x1="190" y1="248" x2="870" y2="248" class="ln-soft"/>
+      <circle cx="250" cy="248" r="7" class="rf"/>
+      <text x="250" y="274" text-anchor="middle" class="sm">跑</text>
+      <circle cx="430" cy="248" r="4" class="ms" fill="none"/>
+      <text x="430" y="274" text-anchor="middle" class="sm m">—</text>
+      <circle cx="620" cy="248" r="7" class="af"/>
+      <text x="620" y="274" text-anchor="middle" class="sm">清理→跑</text>
+      <circle cx="800" cy="248" r="7" class="m"/>
+      <text x="800" y="274" text-anchor="middle" class="sm">清理</text>
+
+      <line x1="15" y1="302" x2="885" y2="302" class="ln-soft dash"/>
+      <text x="15" y="326" class="lbl">执行时机：<tspan class="rf">渲染 → 提交到 DOM → 浏览器绘制 → 才轮到 effect</tspan>。所以 effect 里能安全地读到已经上屏的 DOM。</text>
+      <text x="15" y="346" class="lbl">清理函数（return 的那个）在<tspan class="af">下一次 effect 之前</tspan>和<tspan class="af">卸载时</tspan>各跑一次——第 4 章那个泄漏的定时器，靠的就是它。</text>
+      <text x="15" y="366" class="lbl">开发模式下 StrictMode 会故意"挂载→卸载→再挂载"一次，让你立刻发现没写清理的 effect。这是<tspan class="af">特性，不是 bug</tspan>。</text>
+    </svg>
+    <figcaption>依赖数组不是"什么时候执行"的开关，而是"和上次比，这些值变了吗"的判断依据。React 用 <code>Object.is</code> 逐项比较。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · useEffect 的三种形态</div>
+<pre><code class="language-typescript">import { useEffect, useState } from "react";
+
+export default function Timer() {
+  const [count, setCount] = useState(0);
+  const [gameNumber, setGameNumber] = useState(0);
+
+  useEffect(() =&gt; {
+    let t = 0;
+    const id = setInterval(() =&gt; console.log(t++), 1000);
+    return () =&gt; clearInterval(id);   // ← 必须清理
+  }, [gameNumber]);   // 只有换一局才重启计时器
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Game {gameNumber}&lt;/h1&gt;
+      &lt;button onClick={() =&gt; setCount((c) =&gt; c + 1)}&gt;
+        {count}
+      &lt;/button&gt;
+      &lt;button onClick={() =&gt; setGameNumber((g) =&gt; g + 1)}&gt;
+        New Game
+      &lt;/button&gt;
+    &lt;/&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · 生命周期 + watch</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref, watch, onWatcherCleanup } from "vue";
+
+const count = ref(0);
+const gameNumber = ref(0);
+
+// 依赖显式写在第一个参数里，语义等价于 [gameNumber]
+watch(gameNumber, () =&gt; {
+  let t = 0;
+  const id = setInterval(() =&gt; console.log(t++), 1000);
+  // Vue 3.5+：在副作用内部注册清理
+  onWatcherCleanup(() =&gt; clearInterval(id));
+}, { immediate: true });   // immediate ≈ 挂载时也跑一次
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;h1&gt;Game {{ gameNumber }}&lt;/h1&gt;
+  &lt;button @click="count++"&gt;{{ count }}&lt;/button&gt;
+  &lt;button @click="gameNumber++"&gt;New Game&lt;/button&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th>你想做的事</th><th>React</th><th>Vue 3</th></tr></thead>
+    <tbody>
+      <tr><td>响应式状态</td><td><code>useState</code></td><td><code>ref</code> / <code>reactive</code></td></tr>
+      <tr><td>派生值</td><td>直接在渲染中算（必要时 <code>useMemo</code>）</td><td><code>computed</code>（带缓存）</td></tr>
+      <tr><td>挂载后执行一次</td><td><code>useEffect(fn, [])</code></td><td><code>onMounted(fn)</code></td></tr>
+      <tr><td>依赖变了才执行</td><td><code>useEffect(fn, [dep])</code></td><td><code>watch(dep, fn)</code></td></tr>
+      <tr><td>自动追踪依赖</td><td>没有对应物，必须手写数组</td><td><code>watchEffect(fn)</code></td></tr>
+      <tr><td>卸载时清理</td><td>effect 里 <code>return () =&gt; {}</code></td><td><code>onUnmounted</code> / <code>onWatcherCleanup</code></td></tr>
+      <tr><td>复杂状态机</td><td><code>useReducer</code></td><td>手写 reducer，或用 Pinia</td></tr>
+      <tr><td>跨层级共享</td><td><code>useContext</code></td><td><code>provide</code> / <code>inject</code></td></tr>
+      <tr><td>逻辑复用</td><td>自定义 Hook（<code>useXxx</code>）</td><td>组合式函数（<code>useXxx</code>）</td></tr>
+      <tr><td>稳定引用</td><td><code>useCallback</code> / <code>useMemo</code></td><td>不需要（setup 只跑一次）</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note note--trap">
+    <b>依赖数组：手动 vs 自动，是这一章最大的分歧</b>
+    <p>Vue 的 <code>watchEffect</code> 在<strong>运行时</strong>记录你读过哪些响应式数据，自动建立依赖；
+    React 的依赖数组要<strong>你自己写对</strong>。写少了会读到过期的值（原书 <code>CallMe.js</code> 就是这个问题），
+    写多了会无谓地重跑。装 <code>eslint-plugin-react-hooks</code> 的 <code>exhaustive-deps</code> 规则，别关掉它。</p>
+  </div>
+
+  <h3>useReducer：状态变复杂时的出口</h3>
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · ReducerCounter.tsx</div>
+<pre><code class="language-typescript">import { useReducer } from "react";
+
+type State = { count: number };
+type Action =
+  | { type: "increment"; payload: number }
+  | { type: "decrement"; payload: number }
+  | { type: "reset" };
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "increment":
+      return { count: state.count + action.payload };
+    case "decrement":
+      return { count: state.count - action.payload };
+    case "reset":
+      return { count: 0 };
+  }   // TS 会检查是否覆盖了所有 action
+}
+
+export default function Counter() {
+  const [state, dispatch] = useReducer(reducer, { count: 0 });
+  return (
+    &lt;&gt;
+      Count: {state.count}
+      &lt;button onClick={() =&gt;
+        dispatch({ type: "decrement", payload: 4 })}&gt;-4&lt;/button&gt;
+      &lt;button onClick={() =&gt;
+        dispatch({ type: "increment", payload: 4 })}&gt;+4&lt;/button&gt;
+    &lt;/&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · 组合式函数封装同样逻辑</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref } from "vue";
+
+// Vue 没有 useReducer；状态复杂时直接封装成组合式函数
+function useCounter(initial = 0) {
+  const count = ref(initial);
+  return {
+    count,
+    increment: (n: number) =&gt; { count.value += n; },
+    decrement: (n: number) =&gt; { count.value -= n; },
+    reset: () =&gt; { count.value = 0; },
+  };
+}
+
+const { count, increment, decrement } = useCounter();
+// 跨组件共享时，把这段搬进 Pinia 的 defineStore
+&lt;/script&gt;
+
+&lt;template&gt;
+  Count: {{ count }}
+  &lt;button @click="decrement(4)"&gt;-4&lt;/button&gt;
+  &lt;button @click="increment(4)"&gt;+4&lt;/button&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <h3>自定义 Hook：把逻辑抽出来</h3>
+  <p>原书 <code>useZipLookup.js</code> 把"输入邮编 → 查城市州名"的逻辑抽成了自定义 Hook。这是 Hooks 最大的价值：
+  <strong>逻辑复用不再需要 HOC 或 render props</strong>。规则很简单——函数名以 <code>use</code> 开头，内部可以调其他 Hook。</p>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · useZipLookup.ts</div>
+<pre><code class="language-typescript">import { useEffect, useState } from "react";
+
+type Address = { city: string; state: string } | null;
+
+export function useZipLookup(zipcode: string) {
+  const [address, setAddress] = useState&lt;Address&gt;(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() =&gt; {
+    if (!zipcode) return;
+    const ctrl = new AbortController();   // 原书缺这一步
+    setLoading(true);
+    fetch(`/api/zip/${zipcode}`, { signal: ctrl.signal })
+      .then((r) =&gt; r.json())
+      .then((d) =&gt; setAddress({ city: d.City, state: d.State }))
+      .catch((e) =&gt; { if (e.name !== "AbortError") throw e; })
+      .finally(() =&gt; setLoading(false));
+    return () =&gt; ctrl.abort();   // 邮编再变就取消上一个请求
+  }, [zipcode]);
+
+  return { address, loading };
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · useZipLookup.ts</div>
+<pre><code class="language-typescript">import { ref, watch, onWatcherCleanup, type Ref } from "vue";
+
+type Address = { city: string; state: string } | null;
+
+export function useZipLookup(zipcode: Ref&lt;string&gt;) {
+  const address = ref&lt;Address&gt;(null);
+  const loading = ref(false);
+
+  watch(zipcode, async (zip) =&gt; {
+    if (!zip) return;
+    const ctrl = new AbortController();
+    onWatcherCleanup(() =&gt; ctrl.abort());
+    loading.value = true;
+    try {
+      const r = await fetch(`/api/zip/${zip}`, { signal: ctrl.signal });
+      const d = await r.json();
+      address.value = { city: d.City, state: d.State };
+    } finally {
+      loading.value = false;
+    }
+  }, { immediate: true });
+
+  return { address, loading };
+}</code></pre></div>
+  </div>
+
+  <div class="note note--new">
+    <b>useMemo / useCallback 正在退场</b>
+    <p>原书 <code>CallMe.js</code> → <code>CallMeFixed.js</code> 演示了用 <code>useCallback</code> 稳定函数引用，
+    好让 <code>useEffect</code> 的依赖数组不至于每次都变。这类代码 90% 是在给 React 的默认行为打补丁。
+    <strong>React Compiler</strong> 会在构建时分析出哪些值真正需要缓存并自动插入记忆化，
+    官方的方向是让你不再手写这两个 Hook。新项目可以开启它，然后基本忘掉 <code>useMemo</code>。</p>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>Hook 数据按<strong>调用顺序</strong>存在 Fiber 的槽位里——这就是全部规则的来源。</li>
+      <li><code>useEffect</code> 在提交并绘制之后执行；返回的清理函数在下次 effect 前和卸载时运行。</li>
+      <li>依赖数组要手写对；Vue 的 <code>watchEffect</code> 自动收集，这是两边最实质的体验差别。</li>
+      <li>自定义 Hook / 组合式函数是两边共同的逻辑复用答案，写法几乎一样。</li>
+      <li>StrictMode 下 effect 跑两次是有意为之，用来暴露缺失的清理逻辑。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch10.html"><small>← 上一篇</small>样式与作用域</a>
+  <a class="next" href="sup-effect.html"><small>下一篇 →</small>大部分 useEffect 都不该存在</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

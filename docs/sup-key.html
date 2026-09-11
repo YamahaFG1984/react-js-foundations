@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>key 与协调算法 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html" class="on" aria-current="page"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html" class="on" aria-current="page"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="sup-key">
+  <div class="ch__num">补 A · 书里没有</div>
+  <h2>key 与协调算法</h2>
+  <p class="ch__sub">上一节的管线停在"协调算出差异"。这一节讲它<strong>怎么</strong>算——以及为什么 <code>key</code> 写错会让输入框里的内容整体错位一格。</p>
+
+  <h3>三条规则</h3>
+  <p>React 拿到新旧两棵 Element 树后，不做通用的树 diff（那是 O(n³)），而是靠三条假设把复杂度降到 O(n)：</p>
+  <ol>
+    <li><strong>只比同一层</strong>。跨层级移动节点不会被识别成"移动"，只会是"这边删掉、那边新建"。</li>
+    <li><strong>同一位置上 <code>type</code> 变了，整棵子树扔掉重建</strong>。<code>div</code> 换成 <code>span</code>、<code>Counter</code> 换成 <code>Timer</code>，里面所有 DOM 和 state 一律销毁。</li>
+    <li><strong><code>type</code> 相同时，按 <code>key</code> 配对</strong>。没写 key 就按下标配对。配上了就复用那个节点——包括它的 DOM 和 state。</li>
+  </ol>
+  <p>第三条是全部麻烦的来源。看一个具体场景：</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 470" role="img" aria-label="在列表头部插入一项时，用下标当 key 会让 React 按位置错误配对并复用上一项的 DOM 与状态，使用稳定 id 当 key 则能正确识别出移动与新增">
+      <text x="15" y="22" class="ttl">场景：列表每项带一个输入框（DOM 自己的状态），现在往<tspan class="af">头部</tspan>插入「猕猴桃」</text>
+      <text x="15" y="46" class="lbl">旧数据：苹果（输入「甲」）· 香蕉（输入「乙」）· 樱桃（输入「丙」）　　新数据：猕猴桃 · 苹果 · 香蕉 · 樱桃</text>
+
+      <line x1="450" y1="66" x2="450" y2="400" class="ln-soft dash"/>
+
+      <text x="15" y="92" class="ttl af">key={index}　按下标配对</text>
+      <rect x="15" y="104" width="420" height="48" rx="2" class="box"/>
+      <text x="28" y="124" class="sm">新 key=0「猕猴桃」　配到　旧 key=0「苹果」</text>
+      <text x="28" y="142" class="sm af">复用同一个节点 → 输入框里还是「甲」</text>
+      <rect x="15" y="158" width="420" height="48" rx="2" class="box"/>
+      <text x="28" y="178" class="sm">新 key=1「苹果」　　配到　旧 key=1「香蕉」</text>
+      <text x="28" y="196" class="sm af">复用 → 输入框里是「乙」</text>
+      <rect x="15" y="212" width="420" height="48" rx="2" class="box"/>
+      <text x="28" y="232" class="sm">新 key=2「香蕉」　　配到　旧 key=2「樱桃」</text>
+      <text x="28" y="250" class="sm af">复用 → 输入框里是「丙」</text>
+      <rect x="15" y="266" width="420" height="48" rx="2" class="box"/>
+      <text x="28" y="286" class="sm">新 key=3「樱桃」　　无可配对</text>
+      <text x="28" y="304" class="sm m">新建节点 → 输入框是空的</text>
+      <rect x="15" y="326" width="420" height="52" rx="2" class="box-a"/>
+      <text x="28" y="348" class="sm">四个节点的文字全被改写，</text>
+      <text x="28" y="368" class="sm">用户输入整体<tspan class="af">错位一格</tspan> —— 而且没有任何报错</text>
+
+      <text x="470" y="92" class="ttl vf">key={item.id}　按身份配对</text>
+      <rect x="470" y="104" width="415" height="48" rx="2" class="box"/>
+      <text x="483" y="124" class="sm">新 key=kiwi　　无可配对</text>
+      <text x="483" y="142" class="sm vf">新建一个节点，插在最前面</text>
+      <rect x="470" y="158" width="415" height="48" rx="2" class="box"/>
+      <text x="483" y="178" class="sm">新 key=apple　配到　旧 key=apple</text>
+      <text x="483" y="196" class="sm vf">节点被移动，输入「甲」跟着走</text>
+      <rect x="470" y="212" width="415" height="48" rx="2" class="box"/>
+      <text x="483" y="232" class="sm">新 key=banana 配到　旧 key=banana</text>
+      <text x="483" y="250" class="sm vf">移动，输入「乙」跟着走</text>
+      <rect x="470" y="266" width="415" height="48" rx="2" class="box"/>
+      <text x="483" y="286" class="sm">新 key=cherry 配到　旧 key=cherry</text>
+      <text x="483" y="304" class="sm vf">移动，输入「丙」跟着走</text>
+      <rect x="470" y="326" width="415" height="52" rx="2" class="box-v"/>
+      <text x="483" y="348" class="sm">只新建 1 个节点，其余原地复用，</text>
+      <text x="483" y="368" class="sm">状态<tspan class="vf">正确跟随各自的数据</tspan></text>
+
+      <line x1="15" y1="398" x2="885" y2="398" class="ln-soft dash"/>
+      <text x="15" y="422" class="lbl">key 不是"给 React 的编号"，是<tspan class="af">这条数据的身份证</tspan>。它要在同一个列表里唯一、在多次渲染之间稳定。</text>
+      <text x="15" y="442" class="lbl">别用 <tspan class="af">Math.random()</tspan> 当 key —— 每次渲染都变，等于告诉 React"全部都是新的"，整个列表每次都重建。</text>
+      <text x="15" y="462" class="lbl vf">Vue 的 v-for :key 走的是同一套逻辑，同样的坑一模一样。</text>
+    </svg>
+    <figcaption>下标当 key 的问题不是"性能差一点"，而是<strong>状态挂到了错误的数据上</strong>。列表项越复杂（输入框、展开态、动画、播放中的视频），后果越明显。</figcaption>
+  </figure>
+
+  <div class="note note--trap">
+    <b>什么时候下标当 key 才是安全的</b>
+    <p>三个条件同时满足：列表<strong>永不重排</strong>、只在<strong>末尾</strong>增删、列表项<strong>自身没有状态</strong>（纯展示文本）。
+    留言板按时间追加就符合——所以第 8 章那个例子用 <code>key={i}</code> 没问题。
+    但只要以后可能加上"删除"或"置顶"，它就会立刻变成 bug。默认给稳定 id，成本低得多。</p>
+  </div>
+
+  <h3>规则二的另一面：条件渲染会意外销毁子树</h3>
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React · 同一个组件，被包了一层就重建</div>
+<pre><code class="language-typescript">// ❌ 两个分支里 &lt;Input/&gt; 所在位置的 type 不同
+//    切换 fancy 时，输入框内容会被清空
+{fancy
+  ? &lt;div className="fancy"&gt;&lt;Input /&gt;&lt;/div&gt;
+  : &lt;Input /&gt;}
+
+// ✅ 保持结构一致，只换 class —— 节点被复用，内容保留
+&lt;div className={fancy ? "fancy" : ""}&gt;
+  &lt;Input /&gt;
+&lt;/div&gt;
+
+// 同理，这两个写法的行为完全不同：
+
+// type 相同 → 节点被复用，count 保留
+{isA ? &lt;Counter /&gt; : &lt;Counter /&gt;}
+
+// key 不同 → 卸载重建，count 归零
+{isA ? &lt;Counter key="a" /&gt; : &lt;Counter key="b" /&gt;}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue · 完全一样的规则</div>
+<pre><code class="language-html">&lt;template&gt;
+  &lt;!-- ❌ 两个分支结构不同，切换时 input 内容丢失 --&gt;
+  &lt;div v-if="fancy" class="fancy"&gt;&lt;Input /&gt;&lt;/div&gt;
+  &lt;Input v-else /&gt;
+
+  &lt;!-- ✅ 结构一致 --&gt;
+  &lt;div :class="{ fancy }"&gt;&lt;Input /&gt;&lt;/div&gt;
+
+  &lt;!-- Vue 里 v-if / v-else 的同类型元素默认会复用， --&gt;
+  &lt;!-- 想强制重建就给不同的 key --&gt;
+  &lt;input v-if="isEmail" key="email" placeholder="邮箱" /&gt;
+  &lt;input v-else key="phone" placeholder="手机号" /&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>协调只比同层；<code>type</code> 变了就整棵子树重建；<code>type</code> 相同按 <code>key</code> 配对。</li>
+      <li><code>key</code> 是数据的身份证：同列表内唯一、跨渲染稳定。默认用后端 id 或 <code>crypto.randomUUID()</code>。</li>
+      <li>下标当 key 只在"永不重排 + 只在末尾增删 + 项无状态"时安全。</li>
+      <li>条件渲染时保持两个分支的结构一致，否则子树会被无谓地销毁重建。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch01.html"><small>← 上一篇</small>从 createElement 到 DOM</a>
+  <a class="next" href="ch03.html"><small>下一篇 →</small>JSX 不是模板</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

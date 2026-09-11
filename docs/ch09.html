@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ref：渲染之外的盒子 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html" class="on" aria-current="page"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html" class="on" aria-current="page"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch09">
+  <div class="ch__num">Chapter 09</div>
+  <h2>Ref：渲染之外的盒子</h2>
+  <p class="ch__sub">state 是"会引起重画的数据"，ref 是"跨渲染活着、但不引起重画的盒子"。两句话就能分清它们。</p>
+  <div class="ch__files">chapter09/CreateRefClass.js · CreateRefFunction.js · TextReader.js · TextReaderCallback.js · AudioPlayer.js · ScrollToDemo.js</div>
+
+  <h3>原书清单在做什么</h3>
+  <p>原书演示了三代 ref 写法：字符串 ref（已废弃）、回调 ref（<code>TextReaderCallback.js</code>）、
+  <code>React.createRef()</code>（class）/ <code>useRef()</code>（函数）。用途都一样：拿到真实 DOM 节点，
+  好调用 <code>focus()</code>、<code>play()</code>、<code>scrollTo()</code> 这些 React 不管的命令式 API。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 350" role="img" aria-label="每次渲染的 state 是彼此独立的快照，而 useRef 返回的是同一个对象，在整个组件生命周期内保持不变，读写它不会触发重新渲染">
+      <text x="40" y="24" class="lbl">第 1 次渲染</text>
+      <text x="335" y="24" class="lbl">第 2 次渲染</text>
+      <text x="630" y="24" class="lbl">第 3 次渲染</text>
+      <line x1="315" y1="14" x2="315" y2="150" class="ln-soft dash"/>
+      <line x1="610" y1="14" x2="610" y2="150" class="ln-soft dash"/>
+
+      <rect x="40" y="36" width="230" height="60" rx="2" class="box-a"/>
+      <text x="155" y="60" text-anchor="middle" class="sm">state：count = 0</text>
+      <text x="155" y="80" text-anchor="middle" class="sm m">这次渲染里的常量</text>
+
+      <rect x="335" y="36" width="230" height="60" rx="2" class="box-a"/>
+      <text x="450" y="60" text-anchor="middle" class="sm">state：count = 1</text>
+      <text x="450" y="80" text-anchor="middle" class="sm m">全新的一份快照</text>
+
+      <rect x="630" y="36" width="230" height="60" rx="2" class="box-a"/>
+      <text x="745" y="60" text-anchor="middle" class="sm">state：count = 2</text>
+      <text x="745" y="80" text-anchor="middle" class="sm m">又是全新的一份</text>
+
+      <text x="40" y="126" class="lbl">↑ 三个互不相干的值。每次渲染的闭包各自捕获自己那一份。</text>
+
+      <line x1="155" y1="150" x2="155" y2="188" class="ln r"/>
+      <polygon points="151,188 159,188 155,196" class="rf"/>
+      <line x1="450" y1="150" x2="450" y2="188" class="ln r"/>
+      <polygon points="446,188 454,188 450,196" class="rf"/>
+      <line x1="745" y1="150" x2="745" y2="188" class="ln r"/>
+      <polygon points="741,188 749,188 745,196" class="rf"/>
+      <text x="170" y="176" class="lbl">读写 .current</text>
+      <text x="465" y="176" class="lbl">不触发渲染</text>
+      <text x="760" y="176" class="lbl">值一直在</text>
+
+      <rect x="40" y="196" width="820" height="62" rx="2" class="box-r"/>
+      <text x="450" y="222" text-anchor="middle" class="ttl">useRef 返回的 { current } —— 从挂载到卸载，永远是同一个对象</text>
+      <text x="450" y="244" text-anchor="middle" class="sm m">React 把它存在 Fiber 上；组件函数重跑一百次，拿到的都是这一个</text>
+
+      <line x1="40" y1="282" x2="885" y2="282" class="ln-soft dash"/>
+      <text x="40" y="306" class="lbl">用它存 DOM 节点、定时器 id、上一次的值、不该引起重绘的计数器。</text>
+      <text x="40" y="326" class="lbl af">不要在渲染过程中读写 .current —— 渲染必须是纯的；只在事件处理器和 effect 里碰它。</text>
+      <text x="40" y="346" class="lbl vf">Vue 里不需要这个概念：setup() 只跑一次，一个普通的 let 变量本来就跨"渲染"活着。</text>
+    </svg>
+    <figcaption>useRef 的存在，是"函数组件每次都重跑"这一设计的直接后果——你需要一个地方放"不该被重置、也不该引起重绘"的东西。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · TextReader.tsx</div>
+<pre><code class="language-typescript">import { useEffect, useRef } from "react";
+
+export default function TextReader({ text }: { text: string }) {
+  const textView = useRef&lt;HTMLTextAreaElement&gt;(null);
+
+  // 相当于原书的 componentDidMount
+  useEffect(() =&gt; {
+    textView.current?.focus();
+  }, []);
+
+  return (
+    &lt;textarea
+      ref={textView}
+      defaultValue={text}
+      style={{ width: 380, height: 400 }}
+    /&gt;
+  );
+}
+
+// 滚动到某个元素（原书 ScrollToDemo.js）
+function scrollTo(el: HTMLElement | null) {
+  el?.scrollIntoView({ behavior: "smooth" });
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · TextReader.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { onMounted, useTemplateRef } from "vue";
+
+defineProps&lt;{ text: string }&gt;();
+
+// 名字要和模板里的 ref="textView" 一致
+const textView = useTemplateRef&lt;HTMLTextAreaElement&gt;("textView");
+
+onMounted(() =&gt; {
+  textView.value?.focus();
+});
+
+function scrollTo(el: HTMLElement | null) {
+  el?.scrollIntoView({ behavior: "smooth" });
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;textarea
+    ref="textView"
+    :value="text"
+    style="width: 380px; height: 400px"
+  /&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--trap">
+    <b>"ref" 这个词在两边指的不是一回事</b>
+    <p>Vue 的 <code>ref()</code> 是<strong>响应式状态</strong>，最接近 React 的 <code>useState</code>；
+    Vue 的模板 <code>ref="x"</code> 才是 React 的 <code>useRef</code> + DOM 引用。
+    而 React 的 <code>useRef</code> 用来存"不触发渲染的可变值"时，Vue 侧的对应物是<strong>一个普通变量</strong>——不需要任何 API。</p>
+  </div>
+
+  <h4>React 19：ref 可以直接当 prop 传了</h4>
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · 不再需要 forwardRef</div>
+<pre><code class="language-typescript">// React 18 及以前：必须 forwardRef 包一层
+// const Input = forwardRef((props, ref) =&gt; &lt;input ref={ref} /&gt;);
+
+// React 19：ref 就是一个普通 prop
+function MyInput({ ref, ...rest }: {
+  ref?: React.Ref&lt;HTMLInputElement&gt;;
+} &amp; React.ComponentProps&lt;"input"&gt;) {
+  return &lt;input ref={ref} {...rest} /&gt;;
+}
+
+function Parent() {
+  const inputRef = useRef&lt;HTMLInputElement&gt;(null);
+  return &lt;MyInput ref={inputRef} placeholder="hi" /&gt;;
+}
+
+// 想只暴露特定方法（原书 CountingBox.js 的 useImperativeHandle）
+function CountingBox({ ref }: { ref?: React.Ref&lt;{ count: number }&gt; }) {
+  const [text, setText] = useState("");
+  useImperativeHandle(ref, () =&gt; ({
+    count: text.trim().split(/\s+/).filter(Boolean).length,
+  }), [text]);
+  return &lt;textarea value={text}
+    onChange={(e) =&gt; setText(e.target.value)} /&gt;;
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · defineExpose</div>
+<pre><code class="language-html">&lt;!-- MyInput.vue：子组件默认对父组件封闭 --&gt;
+&lt;script setup lang="ts"&gt;
+import { ref, useTemplateRef } from "vue";
+
+const text = ref("");
+const count = computed(
+  () =&gt; text.value.trim().split(/\s+/).filter(Boolean).length
+);
+
+// 明确声明对外暴露什么，其余一律不可见
+defineExpose({ count });
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;textarea v-model="text" /&gt;
+&lt;/template&gt;
+
+&lt;!-- 父组件 --&gt;
+&lt;script setup lang="ts"&gt;
+const box = useTemplateRef&lt;{ count: number }&gt;("box");
+function report() { console.log(box.value?.count); }
+&lt;/script&gt;
+&lt;template&gt;
+  &lt;MyInput ref="box" /&gt;
+  &lt;button @click="report"&gt;count words&lt;/button&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li><code>useRef</code> = 跨渲染保持同一个对象 + 改它不触发渲染。</li>
+      <li>用途一：拿 DOM 节点做命令式操作；用途二：存不该引起重绘的可变值。</li>
+      <li>React 19 起 <code>ref</code> 是普通 prop，<code>forwardRef</code> 可以不写了。</li>
+      <li>Vue 的 <code>ref()</code> ≈ React 的 <code>useState</code>；Vue 的模板 <code>ref="x"</code> ≈ React 的 DOM ref。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch08.html"><small>← 上一篇</small>受控与非受控表单</a>
+  <a class="next" href="ch10.html"><small>下一篇 →</small>样式与作用域</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

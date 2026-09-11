@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大部分 useEffect 都不该存在 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html" class="on" aria-current="page"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html" class="on" aria-current="page"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="sup-effect">
+  <div class="ch__num">补 C · 书里没有</div>
+  <h2>大部分 useEffect 都不该存在</h2>
+  <p class="ch__sub">上一章讲了 effect 怎么运转。这一节讲更要紧的事：它<strong>不该</strong>用来做什么。初学者写的 effect 里，大约七成是多余的。</p>
+
+  <p>先给判据，一句话：<em class="k">effect 是用来把 React 和它外部的世界对齐的</em>。
+  网络、浏览器 API、订阅、定时器、第三方库——这些东西 React 管不着，需要你手动同步。
+  如果一件事的两端都在 React 内部（state 算 state、props 算 state、点击后改 state），那就不需要 effect。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 480" role="img" aria-label="判断是否需要 useEffect 的决策流程：用户操作触发的写进事件处理器，可推导的值在渲染中直接算，props 变化重置状态用 key，只有与外部世界同步才需要 effect">
+      <text x="15" y="24" class="ttl">我想在某件事发生之后做点什么 ——</text>
+
+      <rect x="100" y="40" width="420" height="56" rx="2" class="box-p"/>
+      <text x="113" y="66" class="sm">这件事是由用户的某个操作直接触发的吗？</text>
+      <text x="113" y="86" class="sm m">点击、提交、输入、拖拽…</text>
+      <line x1="520" y1="68" x2="539" y2="68" class="ln v"/>
+      <polygon points="539,64 539,72 547,68" class="vf"/>
+      <text x="524" y="58" class="lbl vf">是</text>
+      <rect x="555" y="40" width="330" height="56" rx="2" class="box-v"/>
+      <text x="568" y="66" class="sm">写进事件处理器</text>
+      <text x="568" y="86" class="sm m">提交表单、埋点上报、打开弹窗</text>
+      <line x1="310" y1="96" x2="310" y2="118" class="ln"/>
+      <polygon points="306,118 314,118 310,126" class="hd"/>
+      <text x="322" y="114" class="lbl">否</text>
+
+      <rect x="100" y="126" width="420" height="56" rx="2" class="box-p"/>
+      <text x="113" y="152" class="sm">这个值能从现有的 state / props 算出来吗？</text>
+      <text x="113" y="172" class="sm m">全名 = 姓 + 名；筛选后的列表；总价</text>
+      <line x1="520" y1="154" x2="539" y2="154" class="ln v"/>
+      <polygon points="539,150 539,158 547,154" class="vf"/>
+      <text x="524" y="144" class="lbl vf">是</text>
+      <rect x="555" y="126" width="330" height="56" rx="2" class="box-v"/>
+      <text x="568" y="152" class="sm">在渲染中直接算，不要存成 state</text>
+      <text x="568" y="172" class="sm m">真的慢到有感知，才加 useMemo</text>
+      <line x1="310" y1="182" x2="310" y2="204" class="ln"/>
+      <polygon points="306,204 314,204 310,212" class="hd"/>
+      <text x="322" y="200" class="lbl">否</text>
+
+      <rect x="100" y="212" width="420" height="56" rx="2" class="box-p"/>
+      <text x="113" y="238" class="sm">只是想在某个 prop 变化时重置 state？</text>
+      <text x="113" y="258" class="sm m">换了用户就清空表单、换了商品就重置数量</text>
+      <line x1="520" y1="240" x2="539" y2="240" class="ln v"/>
+      <polygon points="539,236 539,244 547,240" class="vf"/>
+      <text x="524" y="230" class="lbl vf">是</text>
+      <rect x="555" y="212" width="330" height="56" rx="2" class="box-v"/>
+      <text x="568" y="238" class="sm">给组件换一个 key，让它重建</text>
+      <text x="568" y="258" class="sm m">见「补 B」</text>
+      <line x1="310" y1="268" x2="310" y2="290" class="ln"/>
+      <polygon points="306,290 314,290 310,298" class="hd"/>
+      <text x="322" y="286" class="lbl">否</text>
+
+      <rect x="100" y="298" width="420" height="56" rx="2" class="box-p"/>
+      <text x="113" y="324" class="sm">要和 React 之外的世界同步吗？</text>
+      <text x="113" y="344" class="sm m">网络请求、订阅、定时器、DOM API、第三方库</text>
+      <line x1="520" y1="326" x2="539" y2="326" class="ln r"/>
+      <polygon points="539,322 539,330 547,326" class="rf"/>
+      <text x="524" y="316" class="lbl rf">是</text>
+      <rect x="555" y="298" width="330" height="56" rx="2" class="box-r"/>
+      <text x="568" y="324" class="sm">设置订阅 / 发起请求 / 装监听器</text>
+      <text x="568" y="344" class="sm m">别忘了在返回的清理函数里撤销</text>
+
+      <line x1="720" y1="354" x2="720" y2="376" class="ln r"/>
+      <polygon points="716,376 724,376 720,384" class="rf"/>
+      <line x1="310" y1="354" x2="310" y2="376" class="ln"/>
+      <polygon points="306,376 314,376 310,384" class="hd"/>
+      <text x="322" y="372" class="lbl">否</text>
+
+      <rect x="100" y="384" width="420" height="46" rx="2" class="box-v"/>
+      <text x="310" y="412" text-anchor="middle" class="sm">不需要 effect —— 上面某一条就够了</text>
+      <rect x="555" y="384" width="330" height="46" rx="2" class="box-r"/>
+      <text x="720" y="412" text-anchor="middle" class="sm">这才是 useEffect 的领地</text>
+
+      <line x1="15" y1="448" x2="885" y2="448" class="ln-soft dash"/>
+      <text x="15" y="472" class="lbl">Vue 侧同理：<tspan class="vf">computed</tspan> 处理前两问，<tspan class="vf">:key</tspan> 处理第三问，只有第四问才该动 <tspan class="vf">watch / watchEffect</tspan>。</text>
+    </svg>
+    <figcaption>每写一个 <code>useEffect</code>，先从头走一遍这四问。绝大多数时候你会在前三问里就找到更简单的答案，而且省掉一次多余的渲染。</figcaption>
+  </figure>
+
+  <h3>四种常见的多余 effect</h3>
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">❌ 用 effect 算派生值</div>
+<pre><code class="language-typescript">function Profile({ first, last }: Props) {
+  const [full, setFull] = useState("");
+
+  // 多渲染一次：先画出空的，再画出正确的
+  useEffect(() =&gt; {
+    setFull(first + " " + last);
+  }, [first, last]);
+
+  return &lt;h1&gt;{full}&lt;/h1&gt;;
+}
+
+// —— 以及：用 effect 响应点击
+function Form() {
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() =&gt; {
+    if (submitted) post(data);   // 逻辑离触发点很远
+  }, [submitted]);
+
+  return &lt;button onClick={() =&gt; setSubmitted(true)}&gt;
+    提交
+  &lt;/button&gt;;
+}</code></pre></div>
+    <div class="pane pane--r"><div class="pane__hd">✅ 改掉之后</div>
+<pre><code class="language-typescript">function Profile({ first, last }: Props) {
+  // 渲染时直接算。它本来就不是"状态"
+  const full = first + " " + last;
+  return &lt;h1&gt;{full}&lt;/h1&gt;;
+}
+
+// —— 事件就写在事件里
+function Form() {
+  function handleSubmit() {
+    post(data);          // 一眼看到因果
+  }
+  return &lt;button onClick={handleSubmit}&gt;提交&lt;/button&gt;;
+}
+
+// —— 筛选列表同理，不要存成 state
+function List({ items, query }: Props) {
+  const visible = items.filter((i) =&gt; i.name.includes(query));
+  return &lt;ul&gt;{visible.map((i) =&gt;
+    &lt;li key={i.id}&gt;{i.name}&lt;/li&gt;)}&lt;/ul&gt;;
+}</code></pre></div>
+  </div>
+
+  <div class="note note--trap">
+    <b>为什么"多渲染一次"值得在意</b>
+    <p>用 effect 算派生值时，React 会先用旧值渲染一次、提交到 DOM、然后跑 effect、再渲染一次。
+    用户可能看到一帧错误的画面（比如闪过一个空字符串或旧的筛选结果）。
+    在渲染中直接算则只有一次渲染，永远不会出现中间态。</p>
+  </div>
+
+  <h3>那什么才是"外部世界"</h3>
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React · 这些才需要 effect</div>
+<pre><code class="language-typescript">// 1. 订阅浏览器事件
+useEffect(() =&gt; {
+  const onResize = () =&gt; setWidth(window.innerWidth);
+  window.addEventListener("resize", onResize);
+  return () =&gt; window.removeEventListener("resize", onResize);
+}, []);
+
+// 2. 操作 React 管不到的 DOM 属性
+useEffect(() =&gt; {
+  document.title = `(${unread}) 收件箱`;
+}, [unread]);
+
+// 3. 接入第三方命令式库
+useEffect(() =&gt; {
+  const map = new MapLib(ref.current!);
+  return () =&gt; map.destroy();
+}, []);
+
+// 4. 网络请求（记得处理竞态，见第 16 章）
+//    但实践中更应该交给 TanStack Query 或路由 loader
+
+// 订阅外部数据源的专用 Hook，比 effect 更合适：
+const width = useSyncExternalStore(
+  (cb) =&gt; { window.addEventListener("resize", cb);
+            return () =&gt; window.removeEventListener("resize", cb); },
+  () =&gt; window.innerWidth,
+  () =&gt; 1024,          // 服务端渲染时的兜底值
+);</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue · 同一条界线</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+
+const first = ref("Ada"), last = ref("Lovelace");
+
+// ✅ 派生值用 computed，不要用 watch 写回另一个 ref
+const full = computed(() =&gt; `${first.value} ${last.value}`);
+
+// ❌ Vue 里对应的反模式长这样：
+// const full = ref("");
+// watch([first, last], () =&gt; { full.value = ... });
+
+// ✅ 外部世界才用生命周期 / watch
+const width = ref(window.innerWidth);
+const onResize = () =&gt; { width.value = window.innerWidth; };
+onMounted(() =&gt; window.addEventListener("resize", onResize));
+onUnmounted(() =&gt; window.removeEventListener("resize", onResize));
+
+// 文档标题这类外部状态
+watch(unread, (n) =&gt; { document.title = `(${n}) 收件箱`; });
+&lt;/script&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--new">
+    <b>顺带说清"渲染必须是纯的"</b>
+    <p>上面所有建议都建立在同一个前提上：<strong>组件函数在渲染期间不能有副作用</strong>——
+    不改外部变量、不改 props、不发请求、不碰 DOM。给定同样的 props 和 state，就要返回同样的结果。
+    这是并发渲染能中断重来、StrictMode 敢跑两遍、React Compiler 敢自动缓存的共同基础。
+    开发模式下那次"多余"的重复调用，正是用来帮你发现哪里破坏了这条规则。</p>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>判据：<strong>effect 用来和 React 之外的世界同步</strong>，两端都在内部就不需要它。</li>
+      <li>用户操作 → 写事件处理器；可推导的值 → 渲染中直接算；props 变了要重置 → 换 key。</li>
+      <li>用 effect 算派生值会多渲染一次，用户可能看到一帧错误画面。</li>
+      <li>订阅外部数据源优先用 <code>useSyncExternalStore</code>；取数优先交给数据层库。</li>
+      <li>渲染必须是纯函数——这是上面一切结论的前提。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch11.html"><small>← 上一篇</small>Hooks 的规则从何而来</a>
+  <a class="next" href="ch12.html"><small>下一篇 →</small>路由：URL 即状态</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

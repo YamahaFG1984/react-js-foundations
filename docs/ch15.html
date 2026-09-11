@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工具链：webpack → Vite · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html" class="on" aria-current="page"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html" class="on" aria-current="page"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch15">
+  <div class="ch__num">Chapter 15</div>
+  <h2>工具链：webpack → Vite</h2>
+  <p class="ch__sub">原书手搭了 webpack + Babel + Jest。这条路今天没人走了，但知道每个环节在干什么，出问题时才不至于抓瞎。</p>
+  <div class="ch__files">chapter15/custom-toolchain/webpack.config.js · babel.config.json · package.json</div>
+
+  <h3>原书清单在做什么</h3>
+  <p>三个配置文件各管一件事：<code>babel.config.json</code> 里的 <code>@babel/preset-react</code> 负责把 JSX 变成函数调用，
+  <code>@babel/preset-env</code> 负责把新语法降级；<code>webpack.config.js</code> 把 <code>babel-loader</code> 挂到 <code>.js</code> 文件上，
+  再把所有模块打成一个包；<code>package.json</code> 里的 Jest 负责测试。今天这三件事被一个工具全包了。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 350" role="img" aria-label="webpack 开发服务器需要先把全部源码打包成 bundle 再交给浏览器，Vite 只用 esbuild 预打包依赖，源码由浏览器通过原生 ESM 按需请求，因此单文件修改的代价不随项目增大">
+      <text x="15" y="22" class="ttl">webpack dev server</text>
+      <line x1="440" y1="10" x2="440" y2="300" class="ln-soft dash"/>
+      <text x="470" y="22" class="ttl">Vite dev server</text>
+
+      <rect x="15" y="38" width="120" height="88" rx="2" class="box-p"/>
+      <text x="75" y="60" text-anchor="middle" class="sm">你的源码</text>
+      <text x="75" y="80" text-anchor="middle" class="sm m">A.tsx</text>
+      <text x="75" y="98" text-anchor="middle" class="sm m">B.tsx</text>
+      <text x="75" y="116" text-anchor="middle" class="sm m">C.tsx</text>
+      <rect x="15" y="136" width="120" height="44" rx="2" class="box-p"/>
+      <text x="75" y="163" text-anchor="middle" class="sm">node_modules</text>
+
+      <line x1="135" y1="105" x2="167" y2="105" class="ln"/>
+      <polygon points="167,101 167,109 175,105" class="hd"/>
+      <line x1="135" y1="158" x2="160" y2="158" class="ln"/>
+      <path d="M160 158 L167 158 L167 112" class="ln"/>
+
+      <rect x="175" y="80" width="115" height="52" rx="2" class="box-a"/>
+      <text x="232" y="103" text-anchor="middle" class="sm">打包</text>
+      <text x="232" y="121" text-anchor="middle" class="sm m">全部一起</text>
+
+      <line x1="290" y1="106" x2="312" y2="106" class="ln"/>
+      <polygon points="312,102 312,110 320,106" class="hd"/>
+
+      <rect x="320" y="80" width="100" height="52" rx="2" class="box"/>
+      <text x="370" y="103" text-anchor="middle" class="sm">bundle.js</text>
+      <text x="370" y="121" text-anchor="middle" class="sm m">一个大文件</text>
+
+      <text x="15" y="210" class="lbl">改一行 B.tsx →</text>
+      <text x="15" y="230" class="lbl af">重新打包受影响的部分</text>
+      <text x="15" y="250" class="lbl af">项目越大，启动和热更新越慢</text>
+
+      <rect x="470" y="38" width="120" height="44" rx="2" class="box-p"/>
+      <text x="530" y="65" text-anchor="middle" class="sm">node_modules</text>
+      <line x1="590" y1="60" x2="612" y2="60" class="ln v"/>
+      <polygon points="612,56 612,64 620,60" class="vf"/>
+      <rect x="620" y="38" width="130" height="44" rx="2" class="box-v"/>
+      <text x="685" y="60" text-anchor="middle" class="sm">esbuild 预打包</text>
+      <text x="685" y="76" text-anchor="middle" class="sm m">只做一次，缓存</text>
+
+      <rect x="470" y="100" width="120" height="80" rx="2" class="box-p"/>
+      <text x="530" y="122" text-anchor="middle" class="sm">你的源码</text>
+      <text x="530" y="142" text-anchor="middle" class="sm m">A.tsx</text>
+      <text x="530" y="160" text-anchor="middle" class="sm m">B.tsx  C.tsx</text>
+
+      <line x1="590" y1="140" x2="612" y2="140" class="ln v"/>
+      <polygon points="612,136 612,144 620,140" class="vf"/>
+      <rect x="620" y="112" width="130" height="56" rx="2" class="box-v"/>
+      <text x="685" y="134" text-anchor="middle" class="sm">按需转译</text>
+      <text x="685" y="152" text-anchor="middle" class="sm m">不打包</text>
+
+      <line x1="750" y1="60" x2="782" y2="60" class="ln v"/>
+      <polygon points="782,56 782,64 790,60" class="vf"/>
+      <line x1="750" y1="140" x2="775" y2="140" class="ln v"/>
+      <path d="M775 140 L782 140 L782 68" class="ln v"/>
+
+      <rect x="790" y="38" width="95" height="130" rx="2" class="box"/>
+      <text x="837" y="86" text-anchor="middle" class="sm">浏览器</text>
+      <text x="837" y="106" text-anchor="middle" class="sm m">原生 ESM</text>
+      <text x="837" y="124" text-anchor="middle" class="sm m">逐个 import</text>
+
+      <text x="470" y="210" class="lbl">改一行 B.tsx →</text>
+      <text x="470" y="230" class="lbl vf">只让 B.tsx 这一个模块失效</text>
+      <text x="470" y="250" class="lbl vf">代价与项目大小无关</text>
+
+      <line x1="15" y1="272" x2="885" y2="272" class="ln-soft dash"/>
+      <text x="15" y="296" class="lbl">生产构建两边都要打包（Vite 用 Rollup / Rolldown）——差别只存在于开发阶段，但那是你 99% 的时间。</text>
+      <text x="15" y="320" class="lbl">React 和 Vue 现在共用同一套工具链：Vite + 各自的官方插件。connect 一个 <tspan class="rf">@vitejs/plugin-react</tspan> 或 <tspan class="vf">@vitejs/plugin-vue</tspan> 就是全部区别。</text>
+      <text x="15" y="342" class="lbl af">create-react-app 已停止维护，官方不再推荐；新项目一律 npm create vite@latest。</text>
+    </svg>
+    <figcaption>Vite 的核心赌注是"浏览器已经原生支持 ES 模块"，于是开发阶段可以完全跳过打包这一步。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React · 从零建项目</div>
+<pre><code class="language-bash">npm create vite@latest my-app -- --template react-ts
+cd my-app &amp;&amp; npm install
+
+npm i -D vitest @testing-library/react \
+         @testing-library/jest-dom jsdom
+npm i -D eslint-plugin-react-hooks
+
+# 可选：开启 React Compiler，自动记忆化
+npm i -D babel-plugin-react-compiler
+
+# vite.config.ts
+# export default defineConfig({
+#   plugins: [react({ babel: { plugins: [
+#     ["babel-plugin-react-compiler", {}]
+#   ]}})],
+#   test: { environment: "jsdom", globals: true },
+# });
+
+npm run dev     # 冷启动通常 &lt; 1s</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue · 从零建项目</div>
+<pre><code class="language-bash">npm create vue@latest my-app
+# 交互式勾选 TypeScript / Router / Pinia / Vitest
+cd my-app &amp;&amp; npm install
+
+# 类型检查（.vue 文件 tsc 看不懂，需要它）
+npm i -D vue-tsc
+
+# package.json
+# "build": "vue-tsc -b &amp;&amp; vite build"
+
+npm run dev     # 同样基于 Vite</code></pre></div>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>Babel/SWC 负责 JSX 与语法降级，打包器负责模块合并——两件事，别混为一谈。</li>
+      <li>Vite 开发期不打包，靠原生 ESM；生产期照常打包。</li>
+      <li>React 和 Vue 今天共用 Vite，差别只是一个插件。</li>
+      <li>CRA 已死；测试用 Vitest + Testing Library。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch13.html"><small>← 上一篇</small>错误边界</a>
+  <a class="next" href="ch16.html"><small>下一篇 →</small>数据获取与持久化</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

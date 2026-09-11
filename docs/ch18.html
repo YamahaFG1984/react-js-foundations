@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal 跳出 DOM 层级 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html" class="on" aria-current="page"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html" class="on" aria-current="page"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch18">
+  <div class="ch__num">Chapter 18</div>
+  <h2>Portal 跳出 DOM 层级</h2>
+  <p class="ch__sub">模态框、下拉菜单、提示气泡都有同一个麻烦：祖先的 <code>overflow: hidden</code> 和 <code>z-index</code> 会把它们裁掉。Portal 就是为此存在的。</p>
+  <div class="ch__files">chapter18/portaldemo/src/Modal.js · ModalWithoutPortal.js · SideBarHelp.js · public/index.html</div>
+
+  <h3>原书清单在做什么</h3>
+  <p><code>public/index.html</code> 在 <code>#root</code> 之外额外准备了 <code>#sidebar</code> 和 <code>#modal</code> 两个空容器；
+  <code>Modal.js</code> 用 <code>ReactDOM.createPortal(jsx, document.getElementById("modal"))</code> 把弹窗的 DOM 送过去。
+  对比 <code>ModalWithoutPortal.js</code> 就能看出差别。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 360" role="img" aria-label="使用 Portal 时组件在 React 树中仍然是父组件的子节点，但它的 DOM 被渲染到另一个容器中，事件和 Context 依旧沿 React 树传递">
+      <text x="15" y="22" class="ttl">React 组件树（没变）</text>
+      <rect x="15" y="36" width="330" height="212" rx="2" class="box-p"/>
+      <text x="30" y="58" class="sm m">&lt;App&gt;</text>
+      <rect x="40" y="70" width="285" height="34" rx="2" class="box"/>
+      <text x="54" y="92" class="sm">&lt;input&gt; 信用卡安全码</text>
+      <rect x="40" y="112" width="285" height="34" rx="2" class="box"/>
+      <text x="54" y="134" class="sm">&lt;button&gt; What's This?</text>
+      <rect x="40" y="154" width="285" height="76" rx="2" class="box-r"/>
+      <text x="54" y="176" class="sm">&lt;Modal&gt;　仍然是 App 的子组件</text>
+      <text x="54" y="196" class="sm m">· props / context 照常往下流</text>
+      <text x="54" y="216" class="sm m">· 里面的 onClick 照常冒泡给 App</text>
+
+      <path d="M345 192 L400 192 L400 108" class="ln a dash"/>
+      <polygon points="396,108 404,108 400,100" class="af"/>
+      <text x="352" y="184" class="lbl af">createPortal</text>
+      <text x="352" y="202" class="lbl af">只搬运 DOM</text>
+
+      <text x="470" y="22" class="ttl">真实 DOM 树（分叉了）</text>
+      <rect x="470" y="36" width="415" height="212" rx="2" class="box-p"/>
+      <text x="484" y="58" class="sm m">&lt;body&gt;</text>
+      <rect x="494" y="70" width="180" height="72" rx="2" class="box"/>
+      <text x="508" y="90" class="sm">&lt;div id="root"&gt;</text>
+      <text x="508" y="110" class="sm m">input</text>
+      <text x="508" y="128" class="sm m">button</text>
+      <rect x="686" y="70" width="180" height="72" rx="2" class="box"/>
+      <text x="700" y="90" class="sm">&lt;div id="sidebar"&gt;</text>
+      <text x="700" y="112" class="sm m">SideBarHelp 的输出</text>
+      <rect x="494" y="154" width="372" height="76" rx="2" class="box-a"/>
+      <text x="508" y="176" class="sm">&lt;div id="modal"&gt;　和 #root 是兄弟</text>
+      <text x="508" y="198" class="sm m">祖先的 overflow:hidden / z-index / transform</text>
+      <text x="508" y="216" class="sm m">再也管不到这里了</text>
+
+      <line x1="15" y1="266" x2="885" y2="266" class="ln-soft dash"/>
+      <text x="15" y="290" class="lbl">这是第 7 章那句话的兑现：<tspan class="af">事件沿 React 树传播，不是 DOM 树</tspan>。所以弹窗里的按钮点击，父组件照样收得到。</text>
+      <text x="15" y="312" class="lbl">别忘了无障碍：Portal 只解决"渲染到哪里"，焦点陷阱、Esc 关闭、aria-modal 还得自己写——</text>
+      <text x="15" y="332" class="lbl">或者直接用原生 <tspan class="rf">&lt;dialog&gt;</tspan> 元素，它自带这些行为，比 Portal + 手写遮罩省事得多。</text>
+    </svg>
+    <figcaption>Portal 改的只有一件事：这棵子树的 DOM 节点挂到哪个容器下。组件关系、数据流、事件冒泡，一概不变。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · Modal.tsx</div>
+<pre><code class="language-typescript">import { createPortal } from "react-dom";
+import { useEffect, useRef, type ReactNode } from "react";
+
+export default function Modal({ title, isOpen, onClose, children }: {
+  title: string; isOpen: boolean;
+  onClose: () =&gt; void; children: ReactNode;
+}) {
+  const dialogRef = useRef&lt;HTMLDialogElement&gt;(null);
+
+  useEffect(() =&gt; {
+    const d = dialogRef.current;
+    if (!d) return;
+    if (isOpen) d.showModal();   // 原生 dialog：自带焦点陷阱和 Esc
+    else d.close();
+  }, [isOpen]);
+
+  return createPortal(
+    &lt;dialog ref={dialogRef} onClose={onClose} aria-label={title}&gt;
+      &lt;h1&gt;{title}&lt;/h1&gt;
+      {children}
+    &lt;/dialog&gt;,
+    document.getElementById("modal")!,
+  );
+}
+
+// 用法：Modal 写在 App 里，DOM 落在 #modal
+// &lt;Modal title="…" isOpen={open} onClose={() =&gt; setOpen(false)}&gt;
+//   &lt;p&gt;…&lt;/p&gt;
+// &lt;/Modal&gt;</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · Modal.vue（Teleport）</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref, watch, useTemplateRef } from "vue";
+
+const props = defineProps&lt;{ title: string; isOpen: boolean }&gt;();
+const emit = defineEmits&lt;{ close: [] }&gt;();
+
+const dialog = useTemplateRef&lt;HTMLDialogElement&gt;("dialog");
+
+watch(() =&gt; props.isOpen, (open) =&gt; {
+  open ? dialog.value?.showModal() : dialog.value?.close();
+});
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;!-- Teleport 就是 Vue 的 Portal，内置指令，无需 import --&gt;
+  &lt;Teleport to="#modal"&gt;
+    &lt;dialog ref="dialog" :aria-label="title" @close="emit('close')"&gt;
+      &lt;h1&gt;{{ title }}&lt;/h1&gt;
+      &lt;slot /&gt;
+    &lt;/dialog&gt;
+  &lt;/Teleport&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>Portal / Teleport 只改变 DOM 落点，不改变组件树关系。</li>
+      <li>因此事件仍沿 React 树冒泡，Context 仍能读到。</li>
+      <li>典型场景：模态框、Toast、Tooltip、被 <code>overflow</code> 裁切的下拉菜单。</li>
+      <li>能用原生 <code>&lt;dialog&gt;</code> 就用，它免费送你焦点管理和 Esc 关闭。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch17.html"><small>← 上一篇</small>Context 穿透组件树</a>
+  <a class="next" href="ch19.html"><small>下一篇 →</small>并发特性与下一步</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

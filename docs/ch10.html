@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>样式与作用域 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html" class="on" aria-current="page"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html" class="on" aria-current="page"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch10">
+  <div class="ch__num">Chapter 10</div>
+  <h2>样式与作用域</h2>
+  <p class="ch__sub">React 本身对 CSS 没有任何主张。所以这一章真正在讨论的问题只有一个：怎么让一个组件的样式不泄漏到别处。</p>
+  <div class="ch__files">chapter10/WarningMessage.js · messageStyles.js · CSSModule.js · my-component.module.css · ExampleStyled.js · StyledParent.js</div>
+
+  <h3>原书清单在做什么</h3>
+  <p><code>StyledParent.js</code> 里注释掉的那行 <code>import './style.css'</code> 是本章的题眼：把它取消注释，
+  <code>style.css</code> 里的 <code>p { font-size: 80px }</code> 会影响<strong>整个应用</strong>的每一个 <code>&lt;p&gt;</code>，
+  不管它在哪个组件里。这就是 CSS 的全局性问题。四种方案分别在不同阶段解决它：</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 400" role="img" aria-label="四种样式方案对比：内联样式没有选择器，CSS Modules 在构建时改写类名，styled-components 在运行时生成类名，Vue scoped 在编译时添加属性选择器">
+      <text x="15" y="22" class="ttl">同样写 .red { color: red }，四种方案最后交给浏览器的东西不同</text>
+
+      <rect x="15" y="40" width="205" height="86" rx="2" class="box-p"/>
+      <text x="28" y="62" class="ttl">内联 style 对象</text>
+      <text x="28" y="84" class="sm">style={{ color: "red" }}</text>
+      <text x="28" y="106" class="sm m">压根没有选择器</text>
+      <line x1="117" y1="126" x2="117" y2="152" class="ln ms"/>
+      <polygon points="113,152 121,152 117,160" class="m"/>
+      <rect x="15" y="160" width="205" height="70" rx="2" class="box"/>
+      <text x="28" y="182" class="sm">&lt;p style="color:red"&gt;</text>
+      <text x="28" y="204" class="sm m">天然隔离，但没有</text>
+      <text x="28" y="221" class="sm m">伪类、媒体查询</text>
+
+      <rect x="240" y="40" width="205" height="86" rx="2" class="box-r"/>
+      <text x="253" y="62" class="ttl">CSS Modules</text>
+      <text x="253" y="84" class="sm">styles.red</text>
+      <text x="253" y="106" class="sm m">构建时改名</text>
+      <line x1="342" y1="126" x2="342" y2="152" class="ln r"/>
+      <polygon points="338,152 346,152 342,160" class="rf"/>
+      <rect x="240" y="160" width="205" height="70" rx="2" class="box"/>
+      <text x="253" y="182" class="sm">.Card_red__a3f9x</text>
+      <text x="253" y="204" class="sm m">名字全局唯一，</text>
+      <text x="253" y="221" class="sm m">冲突不可能发生</text>
+
+      <rect x="465" y="40" width="205" height="86" rx="2" class="box-r"/>
+      <text x="478" y="62" class="ttl">CSS-in-JS</text>
+      <text x="478" y="84" class="sm">styled.h1`…`</text>
+      <text x="478" y="106" class="sm m">运行时生成并注入</text>
+      <line x1="567" y1="126" x2="567" y2="152" class="ln r"/>
+      <polygon points="563,152 571,152 567,160" class="rf"/>
+      <rect x="465" y="160" width="205" height="70" rx="2" class="box"/>
+      <text x="478" y="182" class="sm">.sc-bdVaJa</text>
+      <text x="478" y="204" class="sm m">能按 props 换样式，</text>
+      <text x="478" y="221" class="sm m">代价是运行时开销</text>
+
+      <rect x="690" y="40" width="195" height="86" rx="2" class="box-v"/>
+      <text x="703" y="62" class="ttl">Vue &lt;style scoped&gt;</text>
+      <text x="703" y="84" class="sm">.red { color: red }</text>
+      <text x="703" y="106" class="sm m">编译时加属性</text>
+      <line x1="787" y1="126" x2="787" y2="152" class="ln v"/>
+      <polygon points="783,152 791,152 787,160" class="vf"/>
+      <rect x="690" y="160" width="195" height="70" rx="2" class="box"/>
+      <text x="703" y="182" class="sm">.red[data-v-7ba5]</text>
+      <text x="703" y="204" class="sm m">类名不变，靠属性</text>
+      <text x="703" y="221" class="sm m">选择器限定范围</text>
+
+      <line x1="15" y1="256" x2="885" y2="256" class="ln-soft dash"/>
+      <text x="15" y="280" class="ttl">今天的默认选择</text>
+      <text x="15" y="304" class="lbl">· 组件私有样式：CSS Modules（零运行时）或 Vue 的 scoped —— 两者思路一致，都在构建期解决</text>
+      <text x="15" y="324" class="lbl">· 整套设计系统：Tailwind 这类原子类，把"作用域问题"变成"根本没有自定义选择器"</text>
+      <text x="15" y="344" class="lbl">· 需要按 props 动态计算样式：CSS 变量 + 一个类名，通常比 CSS-in-JS 更划算</text>
+      <text x="15" y="370" class="lbl af">styled-components 已进入维护模式，React 官方也不再推荐运行时 CSS-in-JS —— 新项目别从这里起步。</text>
+    </svg>
+    <figcaption>四种方案解决的是同一个问题：让 <code>.red</code> 只对我的组件生效。区别只在"什么时候动手"——写代码时、构建时，还是运行时。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · CSS Modules + CSS 变量</div>
+<pre><code class="language-typescript">/* Message.module.css */
+.message { padding: 6px; border-radius: 3px;
+  color: var(--fg); background: var(--bg); }
+
+// Message.tsx
+import styles from "./Message.module.css";
+
+type Kind = "warning" | "info" | "success";
+
+const palette: Record&lt;Kind, { fg: string; bg: string }&gt; = {
+  warning: { fg: "#fff", bg: "#b3261e" },
+  info:    { fg: "#111", bg: "#e8eaed" },
+  success: { fg: "#fff", bg: "#1b5e20" },
+};
+
+export default function Message(
+  { kind = "info", text }: { kind?: Kind; text: string }
+) {
+  const c = palette[kind];
+  return (
+    &lt;p
+      className={styles.message}
+      style={{ "--fg": c.fg, "--bg": c.bg } as React.CSSProperties}
+    &gt;{text}&lt;/p&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · scoped + v-bind() in CSS</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { computed } from "vue";
+
+type Kind = "warning" | "info" | "success";
+const { kind = "info", text } = defineProps&lt;{
+  kind?: Kind; text: string;
+}&gt;();
+
+const palette = {
+  warning: { fg: "#fff", bg: "#b3261e" },
+  info:    { fg: "#111", bg: "#e8eaed" },
+  success: { fg: "#fff", bg: "#1b5e20" },
+};
+const c = computed(() =&gt; palette[kind]);
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;p class="message"&gt;{{ text }}&lt;/p&gt;
+&lt;/template&gt;
+
+&lt;style scoped&gt;
+/* v-bind 会被编译成 CSS 变量，自动跟随响应式更新 */
+.message {
+  padding: 6px; border-radius: 3px;
+  color: v-bind("c.fg");
+  background: v-bind("c.bg");
+}
+&lt;/style&gt;</code></pre></div>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>React 对 CSS 无主张，所以方案多；Vue 内置 <code>scoped</code>，多数项目不用选。</li>
+      <li>内联 <code>style</code> 用对象，属性名是驼峰，数字自动补 <code>px</code>。</li>
+      <li>优先 CSS Modules / scoped 这类构建期方案；运行时 CSS-in-JS 已不是推荐路线。</li>
+      <li>动态样式交给 CSS 变量，比重新生成类名便宜得多。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch09.html"><small>← 上一篇</small>Ref：渲染之外的盒子</a>
+  <a class="next" href="ch11.html"><small>下一篇 →</small>Hooks 的规则从何而来</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

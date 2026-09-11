@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>React ↔ Vue 速查表 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html" class="on" aria-current="page"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html" class="on" aria-current="page"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="cheat">
+  <div class="ch__num">★ 附录</div>
+  <h2>React ↔ Vue 速查表</h2>
+  <p class="ch__sub">把全书的对照集中在一处。左列是意图，中右两列是两边的标准答案。</p>
+
+  <h3>响应式与状态</h3>
+  <div class="tw"><table>
+    <thead><tr><th>意图</th><th>React 19</th><th>Vue 3 + TS</th></tr></thead>
+    <tbody>
+      <tr><td>局部状态</td><td><code>const [v, setV] = useState(0)</code></td><td><code>const v = ref(0)</code></td></tr>
+      <tr><td>读取</td><td><code>v</code></td><td><code>v.value</code>（模板里自动解包）</td></tr>
+      <tr><td>修改</td><td><code>setV(1)</code> / <code>setV(p =&gt; p+1)</code></td><td><code>v.value = 1</code> / <code>v.value++</code></td></tr>
+      <tr><td>对象状态</td><td><code>useState({})</code>，改时必须造新对象</td><td><code>reactive({})</code>，可直接改字段</td></tr>
+      <tr><td>数组增删</td><td><code>setL([...l, x])</code> / <code>l.filter()</code></td><td><code>l.value.push(x)</code> / <code>splice()</code></td></tr>
+      <tr><td>派生值</td><td>渲染中直接算</td><td><code>computed(() =&gt; …)</code>（有缓存）</td></tr>
+      <tr><td>不触发渲染的可变值</td><td><code>useRef(x)</code> → <code>.current</code></td><td>普通 <code>let</code> 变量</td></tr>
+      <tr><td>复杂状态机</td><td><code>useReducer</code></td><td>组合式函数 / Pinia</td></tr>
+      <tr><td>全局状态</td><td>Zustand / Jotai / Context</td><td>Pinia</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>模板与渲染</h3>
+  <div class="tw"><table>
+    <thead><tr><th>意图</th><th>React 19</th><th>Vue 3 + TS</th></tr></thead>
+    <tbody>
+      <tr><td>插值</td><td><code>{value}</code></td><td><code>{{ value }}</code></td></tr>
+      <tr><td>属性绑定</td><td><code>src={url}</code></td><td><code>:src="url"</code></td></tr>
+      <tr><td>条件</td><td><code>{ok ? &lt;A/&gt; : &lt;B/&gt;}</code></td><td><code>v-if</code> / <code>v-else</code></td></tr>
+      <tr><td>列表</td><td><code>{l.map(x =&gt; &lt;i key={x.id}/&gt;)}</code></td><td><code>v-for</code> + <code>:key</code></td></tr>
+      <tr><td>class</td><td><code>className={clsx("a", {b: ok})}</code></td><td><code>:class="['a', {b: ok}]"</code></td></tr>
+      <tr><td>多根节点</td><td><code>&lt;&gt;…&lt;/&gt;</code></td><td>模板天然支持</td></tr>
+      <tr><td>插槽</td><td><code>children</code> / element prop</td><td><code>&lt;slot&gt;</code> / <code>&lt;template #x&gt;</code></td></tr>
+      <tr><td>作用域插槽</td><td>children 传函数 <code>({x}) =&gt; …</code></td><td><code>&lt;slot :x="x"/&gt;</code> + <code>#default="{x}"</code></td></tr>
+      <tr><td>渲染到别处</td><td><code>createPortal(jsx, node)</code></td><td><code>&lt;Teleport to="#id"&gt;</code></td></tr>
+      <tr><td>跳过重渲染</td><td><code>memo()</code>（或交给 Compiler）</td><td>不需要</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>组件通信</h3>
+  <div class="tw"><table>
+    <thead><tr><th>意图</th><th>React 19</th><th>Vue 3 + TS</th></tr></thead>
+    <tbody>
+      <tr><td>声明 props</td><td><code>function C(p: Props)</code></td><td><code>defineProps&lt;Props&gt;()</code></td></tr>
+      <tr><td>props 默认值</td><td>解构默认值 <code>{x = 1}</code></td><td>解构默认值（3.5+）/ <code>withDefaults</code></td></tr>
+      <tr><td>向上通知</td><td>回调 prop <code>onChange</code></td><td><code>defineEmits&lt;{change:[v]}&gt;()</code></td></tr>
+      <tr><td>双向绑定</td><td>手写 <code>value</code> + <code>onChange</code></td><td><code>v-model</code> / <code>defineModel()</code></td></tr>
+      <tr><td>跨层级</td><td><code>createContext</code> + <code>useContext</code></td><td><code>provide</code> / <code>inject</code></td></tr>
+      <tr><td>暴露方法给父组件</td><td><code>ref</code> prop + <code>useImperativeHandle</code></td><td><code>defineExpose</code></td></tr>
+      <tr><td>拿 DOM 节点</td><td><code>useRef</code> + <code>ref={r}</code></td><td><code>useTemplateRef("x")</code> + <code>ref="x"</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>副作用与生命周期</h3>
+  <div class="tw"><table>
+    <thead><tr><th>意图</th><th>React 19</th><th>Vue 3 + TS</th></tr></thead>
+    <tbody>
+      <tr><td>挂载后</td><td><code>useEffect(fn, [])</code></td><td><code>onMounted(fn)</code></td></tr>
+      <tr><td>卸载前</td><td>effect 里 <code>return cleanup</code></td><td><code>onUnmounted(fn)</code></td></tr>
+      <tr><td>依赖变化时</td><td><code>useEffect(fn, [a, b])</code></td><td><code>watch([a, b], fn)</code></td></tr>
+      <tr><td>自动追踪依赖</td><td>无</td><td><code>watchEffect(fn)</code></td></tr>
+      <tr><td>副作用清理</td><td>effect 的返回值</td><td><code>onWatcherCleanup(fn)</code></td></tr>
+      <tr><td>DOM 更新后</td><td><code>useLayoutEffect</code>（绘制前）</td><td><code>nextTick()</code> / <code>onUpdated</code></td></tr>
+      <tr><td>捕获子树错误</td><td>class 边界 / <code>react-error-boundary</code></td><td><code>onErrorCaptured</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <b>最后一句</b>
+    <p>这两个框架的差别，不在 API 数量，而在<strong>它们各自认为"变化"应该怎么被发现</strong>：
+    React 说"我重算一遍再比对"，Vue 说"我记住谁依赖谁再通知"。
+    往回翻到导读那张图——你现在应该能把这份速查表里的每一行，都挂回那两条流水线上。</p>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch19.html"><small>← 上一篇</small>并发特性与下一步</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

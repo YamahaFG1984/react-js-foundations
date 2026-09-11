@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>并发特性与下一步 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html" class="on" aria-current="page"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html" class="on" aria-current="page"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch19">
+  <div class="ch__num">Chapter 19</div>
+  <h2>并发特性与下一步</h2>
+  <p class="ch__sub">仓库里 <code>chapter19/index.js</code> 是个空文件。这一节就用来补上：书出版之后，React 真正变了的那部分。</p>
+  <div class="ch__files">chapter19/index.js（0 字节）</div>
+
+  <h3>并发渲染：让渲染可以被打断</h3>
+  <p>这是 React 18 最本质的变化，也是 Fiber 那套结构存在的理由。在此之前，一次渲染一旦开始就必须跑完，
+  中途用户的输入只能干等。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 330" role="img" aria-label="同步渲染下大列表的渲染会阻塞输入框响应，使用 useTransition 后输入被标记为紧急更新可以打断正在进行的列表渲染">
+      <text x="15" y="22" class="ttl af">同步渲染：一次开始就必须跑完</text>
+      <line x1="150" y1="36" x2="870" y2="36" class="ln-soft"/>
+      <text x="15" y="66" class="sm">主线程</text>
+      <rect x="150" y="52" width="30" height="22" rx="2" class="box-a"/>
+      <text x="165" y="68" text-anchor="middle" class="sm">键</text>
+      <rect x="182" y="52" width="330" height="22" rx="2" class="box-p"/>
+      <text x="347" y="68" text-anchor="middle" class="sm">渲染 10000 行列表（约 300ms，不可中断）</text>
+      <rect x="514" y="52" width="30" height="22" rx="2" class="box-a"/>
+      <text x="529" y="68" text-anchor="middle" class="sm">键</text>
+      <rect x="546" y="52" width="324" height="22" rx="2" class="box-p"/>
+      <text x="708" y="68" text-anchor="middle" class="sm">再渲染一次（又是 300ms）</text>
+      <text x="150" y="98" class="lbl af">用户体验：输入框里的字要等列表画完才出现——明显的卡顿</text>
+
+      <line x1="15" y1="120" x2="885" y2="120" class="ln-soft dash"/>
+
+      <text x="15" y="148" class="ttl vf">useTransition：把列表渲染降级为"可打断"</text>
+      <line x1="150" y1="162" x2="870" y2="162" class="ln-soft"/>
+      <text x="15" y="192" class="sm">主线程</text>
+      <rect x="150" y="178" width="30" height="22" rx="2" class="box-a"/>
+      <text x="165" y="194" text-anchor="middle" class="sm">键</text>
+      <rect x="182" y="178" width="26" height="22" rx="2" class="box-v"/>
+      <text x="195" y="194" text-anchor="middle" class="sm">✓</text>
+      <rect x="210" y="178" width="150" height="22" rx="2" class="box-p"/>
+      <text x="285" y="194" text-anchor="middle" class="sm">开始画列表…</text>
+      <line x1="354" y1="172" x2="366" y2="206" class="ln a"/>
+      <line x1="366" y1="172" x2="354" y2="206" class="ln a"/>
+      <rect x="372" y="178" width="30" height="22" rx="2" class="box-a"/>
+      <text x="387" y="194" text-anchor="middle" class="sm">键</text>
+      <rect x="404" y="178" width="26" height="22" rx="2" class="box-v"/>
+      <text x="417" y="194" text-anchor="middle" class="sm">✓</text>
+      <rect x="432" y="178" width="438" height="22" rx="2" class="box-p"/>
+      <text x="651" y="194" text-anchor="middle" class="sm">用最新的输入重新画列表，这次跑完</text>
+      <text x="150" y="224" class="lbl vf">输入立刻上屏（紧急更新），列表渲染被新输入打断后作废重来（过渡更新）</text>
+
+      <line x1="15" y1="246" x2="885" y2="246" class="ln-soft dash"/>
+      <text x="15" y="270" class="lbl">React 把更新分成两档：<tspan class="af">紧急</tspan>（输入、点击、悬停）必须立刻响应；<tspan class="hd">过渡</tspan>（搜索结果、切页）可以慢、可以被打断。</text>
+      <text x="15" y="292" class="lbl">这正是 Fiber 的用武之地——渲染工作被切成一个个小单元，每做完一段就检查有没有更紧急的事。</text>
+      <text x="15" y="314" class="lbl vf">Vue 目前没有对应机制（渲染是同步的）。实践中靠虚拟滚动、defer 组件、Web Worker 解决同类问题。</text>
+    </svg>
+    <figcaption>并发不是"多线程"。它是把一次长渲染切成许多小段，让浏览器在段与段之间有机会处理用户输入。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · 并发 API 速览</div>
+<pre><code class="language-typescript">import { useState, useTransition, useDeferredValue,
+         Suspense, use } from "react";
+
+function Search() {
+  const [query, setQuery] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const [results, setResults] = useState&lt;string[]&gt;([]);
+
+  function onChange(v: string) {
+    setQuery(v);                       // 紧急：立刻上屏
+    startTransition(() =&gt; {            // 过渡：可被打断
+      setResults(expensiveFilter(v));
+    });
+  }
+
+  return (
+    &lt;&gt;
+      &lt;input value={query}
+        onChange={(e) =&gt; onChange(e.target.value)} /&gt;
+      &lt;ul style={{ opacity: isPending ? 0.6 : 1 }}&gt;
+        {results.map((r) =&gt; &lt;li key={r}&gt;{r}&lt;/li&gt;)}
+      &lt;/ul&gt;
+    &lt;/&gt;
+  );
+}
+
+// 更省事的写法：让派生值"落后一拍"
+function Search2() {
+  const [query, setQuery] = useState("");
+  const deferred = useDeferredValue(query);
+  const results = expensiveFilter(deferred);
+  // …
+}
+
+// use()：在渲染中直接读 Promise，配合 Suspense
+function Profile({ userPromise }: { userPromise: Promise&lt;User&gt; }) {
+  const user = use(userPromise);      // 挂起直到 resolve
+  return &lt;h1&gt;{user.name}&lt;/h1&gt;;
+}
+
+&lt;Suspense fallback={&lt;Skeleton /&gt;}&gt;
+  &lt;Profile userPromise={fetchUser(id)} /&gt;
+&lt;/Suspense&gt;</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · 对应能力</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref, computed, defineAsyncComponent } from "vue";
+
+// Vue 没有 useTransition / useDeferredValue。
+// 同类问题的常规解法：
+// 1) 防抖 + computed
+import { refDebounced } from "@vueuse/core";
+const query = ref("");
+const deferred = refDebounced(query, 150);
+const results = computed(() =&gt; expensiveFilter(deferred.value));
+
+// 2) 长列表用虚拟滚动（vue-virtual-scroller）
+
+// 3) &lt;Suspense&gt; 存在，但仍是实验性 API
+// 4) 异步组件 + 加载态
+const Profile = defineAsyncComponent({
+  loader: () =&gt; import("./Profile.vue"),
+  loadingComponent: Skeleton,
+});
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;input v-model="query" /&gt;
+  &lt;ul&gt;&lt;li v-for="r in results" :key="r"&gt;{{ r }}&lt;/li&gt;&lt;/ul&gt;
+
+  &lt;!-- 实验性 --&gt;
+  &lt;Suspense&gt;
+    &lt;Profile /&gt;
+    &lt;template #fallback&gt;&lt;Skeleton /&gt;&lt;/template&gt;
+  &lt;/Suspense&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <h3>书里完全没有、但今天绕不开的三件事</h3>
+  <div class="tw"><table>
+    <thead><tr><th>主题</th><th>是什么</th><th>什么时候需要</th></tr></thead>
+    <tbody>
+      <tr><td>Server Components</td><td>在服务端执行、不进客户端 bundle 的组件；可以直接读数据库</td><td>用 Next.js / React Router 框架模式做全栈应用时</td></tr>
+      <tr><td>React Compiler</td><td>构建时自动插入记忆化，替代手写 <code>useMemo</code>/<code>useCallback</code></td><td>新项目就可以开；老项目按目录逐步启用</td></tr>
+      <tr><td>状态管理库</td><td>Zustand / Jotai（细粒度订阅），替代"什么都塞 Context"</td><td>跨页面共享、需要避免大面积重渲染时</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>并发渲染 = 把长渲染切片，让紧急更新可以插队。</li>
+      <li><code>useTransition</code> / <code>useDeferredValue</code> 是你日常唯一会碰到的两个并发 API。</li>
+      <li><code>use()</code> + <code>Suspense</code> 让"读取异步数据"变成渲染期的普通操作。</li>
+      <li>Vue 目前不提供并发渲染，同类问题靠防抖、虚拟滚动、异步组件解决。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch18.html"><small>← 上一篇</small>Portal 跳出 DOM 层级</a>
+  <a class="next" href="cheat.html"><small>下一篇 →</small>React ↔ Vue 速查表</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>错误边界 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html" class="on" aria-current="page"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html" class="on" aria-current="page"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch13">
+  <div class="ch__num">Chapter 13</div>
+  <h2>错误边界</h2>
+  <p class="ch__sub">一个组件抛错，默认会让<strong>整个应用</strong>白屏。错误边界的作用是在树上设一道闸，把爆炸范围限制住。</p>
+  <div class="ch__files">chapter13/ErrorBoundary.js · ErrorBoundaryWithDidCatch.js · ErrorBoundaryWithReset.js · SampleTree.js · SampleTreeWithBoundary.js · BadComponent.js</div>
+
+  <h3>原书清单在做什么</h3>
+  <p><code>SampleTree.js</code> 里的 <code>Main</code> 调用了一个不存在的 <code>props.renderTheGraph</code>，运行时抛错；
+  <code>SampleTreeWithBoundary.js</code> 只是把 <code>&lt;Main/&gt;</code> 用 <code>&lt;ErrorBoundary&gt;</code> 包了一层，
+  结果 NavBar 和 Footer 就活下来了。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 330" role="img" aria-label="没有错误边界时组件抛出的错误会一路冒泡并导致整棵树被卸载；加上错误边界后错误在最近的边界处被捕获，只有该子树被替换为兜底界面">
+      <text x="30" y="24" class="ttl af">没有边界：整棵树被卸载</text>
+      <rect x="30" y="38" width="380" height="200" rx="2" class="box-p"/>
+      <text x="44" y="58" class="sm m">&lt;App /&gt;</text>
+      <rect x="50" y="68" width="150" height="40" rx="2" class="box"/>
+      <text x="125" y="93" text-anchor="middle" class="sm">NavBar</text>
+      <rect x="50" y="118" width="150" height="40" rx="2" class="box-a"/>
+      <text x="125" y="137" text-anchor="middle" class="sm">Main</text>
+      <text x="125" y="152" text-anchor="middle" class="sm af">throw</text>
+      <rect x="50" y="168" width="150" height="40" rx="2" class="box"/>
+      <text x="125" y="193" text-anchor="middle" class="sm">Footer</text>
+
+      <path d="M210 138 L250 138 L250 60 L215 60" class="ln a"/>
+      <polygon points="215,56 215,64 207,60" class="af"/>
+      <text x="256" y="104" class="lbl af">一路冒到根</text>
+
+      <rect x="270" y="120" width="128" height="70" rx="2" class="box-a"/>
+      <text x="334" y="146" text-anchor="middle" class="sm">React 卸载</text>
+      <text x="334" y="164" text-anchor="middle" class="sm">整棵树</text>
+      <text x="334" y="182" text-anchor="middle" class="sm af">→ 白屏</text>
+
+      <line x1="440" y1="14" x2="440" y2="250" class="ln-soft dash"/>
+
+      <text x="470" y="24" class="ttl vf">有边界：只炸掉边界内的那一块</text>
+      <rect x="470" y="38" width="400" height="200" rx="2" class="box-p"/>
+      <text x="484" y="58" class="sm m">&lt;App /&gt;</text>
+      <rect x="490" y="68" width="150" height="40" rx="2" class="box-v"/>
+      <text x="565" y="93" text-anchor="middle" class="sm">NavBar 完好</text>
+      <rect x="490" y="118" width="240" height="46" rx="2" class="box-r"/>
+      <text x="504" y="136" class="sm">&lt;ErrorBoundary&gt;</text>
+      <text x="504" y="154" class="sm af">→ 显示兜底界面</text>
+      <rect x="490" y="174" width="150" height="40" rx="2" class="box-v"/>
+      <text x="565" y="199" text-anchor="middle" class="sm">Footer 完好</text>
+      <path d="M740 141 L770 141" class="ln r"/>
+      <polygon points="770,137 770,145 778,141" class="rf"/>
+      <text x="746" y="132" class="lbl">在这里被截住</text>
+
+      <line x1="30" y1="258" x2="885" y2="258" class="ln-soft dash"/>
+      <text x="30" y="282" class="lbl">错误沿<tspan class="af">组件树</tspan>向上冒泡，被<tspan class="af">最近的一个</tspan>边界捕获——和 try/catch 的嵌套语义一样。</text>
+      <text x="30" y="302" class="lbl">捕不到的：事件处理器里的错误、setTimeout / Promise 里的错误、服务端渲染、边界自己抛的错。</text>
+      <text x="30" y="322" class="lbl">建议至少设两层：整个应用一层兜底，每个独立功能区（图表、编辑器、第三方 widget）各一层。</text>
+    </svg>
+    <figcaption>边界放得越细，一次崩溃影响的面积越小。放在路由层是性价比最高的起点。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · react-error-boundary</div>
+<pre><code class="language-typescript">import { ErrorBoundary } from "react-error-boundary";
+import { createRoot } from "react-dom/client";
+
+// 错误边界至今仍必须是 class（唯一还需要 class 的场景），
+// 所以实践中直接用这个库，别自己写。
+function Fallback({ error, resetErrorBoundary }: {
+  error: Error; resetErrorBoundary: () =&gt; void;
+}) {
+  return (
+    &lt;div role="alert"&gt;
+      &lt;p&gt;这块内容加载失败：{error.message}&lt;/p&gt;
+      &lt;button onClick={resetErrorBoundary}&gt;重试&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+export default function App() {
+  return (
+    &lt;&gt;
+      &lt;NavBar /&gt;
+      &lt;ErrorBoundary
+        FallbackComponent={Fallback}
+        onError={(e, info) =&gt; reportToServer(e, info)}
+      &gt;
+        &lt;Main /&gt;
+      &lt;/ErrorBoundary&gt;
+      &lt;Footer /&gt;
+    &lt;/&gt;
+  );
+}
+
+// React 19：根级别的兜底钩子
+createRoot(document.getElementById("root")!, {
+  onUncaughtError: (e, info) =&gt; reportToServer(e, info),
+  onCaughtError:   (e, info) =&gt; reportToServer(e, info),
+}).render(&lt;App /&gt;);</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · onErrorCaptured</div>
+<pre><code class="language-html">&lt;!-- ErrorBoundary.vue：任何组件都能当边界 --&gt;
+&lt;script setup lang="ts"&gt;
+import { ref, onErrorCaptured } from "vue";
+
+const error = ref&lt;Error | null&gt;(null);
+
+onErrorCaptured((err) =&gt; {
+  error.value = err as Error;
+  return false;   // 返回 false 阻止继续向上冒泡
+});
+
+function reset() { error.value = null; }
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div v-if="error" role="alert"&gt;
+    &lt;p&gt;这块内容加载失败：{{ error.message }}&lt;/p&gt;
+    &lt;button @click="reset"&gt;重试&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;slot v-else /&gt;
+&lt;/template&gt;
+
+&lt;!-- 全局兜底 --&gt;
+&lt;script&gt;
+// main.ts
+app.config.errorHandler = (err, instance, info) =&gt; {
+  reportToServer(err, info);
+};
+&lt;/script&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--trap">
+    <b>两边都捕不到异步错误</b>
+    <p><code>setTimeout</code>、Promise、事件处理器里抛的错，React 的错误边界和 Vue 的 <code>onErrorCaptured</code> 都不管——
+    因为它们不在渲染调用栈里。这类错误要么自己 <code>try/catch</code> 后转成 state，
+    要么用 <code>window.addEventListener("unhandledrejection", …)</code> 全局兜。</p>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>错误沿组件树冒泡，被最近的边界捕获，边界内的子树被换成兜底界面。</li>
+      <li>React 里错误边界仍需 class——直接用 <code>react-error-boundary</code>。</li>
+      <li>Vue 里任何组件加个 <code>onErrorCaptured</code> 就是边界，返回 <code>false</code> 阻止冒泡。</li>
+      <li>异步错误两边都捕不到，需要单独处理。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch12.html"><small>← 上一篇</small>路由：URL 即状态</a>
+  <a class="next" href="ch15.html"><small>下一篇 →</small>工具链：webpack → Vite</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

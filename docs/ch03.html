@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSX 不是模板 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html" class="on" aria-current="page"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html" class="on" aria-current="page"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch03">
+  <div class="ch__num">Chapter 03</div>
+  <h2>JSX 不是模板</h2>
+  <p class="ch__sub">花括号里是 JavaScript 表达式，不是模板语法。理解这一条，本章所有"技巧"都变成常识。</p>
+  <div class="ch__files">chapter03/ConditionalWelcome{,2,3}.js · FragmentExample{1,2}.js · ImmediateInvoke.js · SearchBox/</div>
+
+  <h3>原书清单在做什么</h3>
+  <p>三个 <code>ConditionalWelcome</code> 展示了条件渲染的三种写法，<code>ImmediateInvoke.js</code> 甚至在 JSX 里塞了个立即执行函数。
+  它们背后是同一条规则：<code>{}</code> 里必须能求值成一个<strong>值</strong>，所以 <code>if</code> 语句不行，三元和 <code>&amp;&amp;</code> 行。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 330" role="img" aria-label="把 JSX 赋给变量只是创建了一个描述对象，组件函数并未执行；只有当这个对象被返回并挂进渲染树，React 才会调用组件函数">
+      <text x="15" y="20" class="ttl">① 写下 JSX ≠ 组件被执行</text>
+
+      <rect x="15" y="40" width="300" height="76" rx="2" class="box-p"/>
+      <text x="30" y="64" class="sm">const header = &lt;Header /&gt;;</text>
+      <text x="30" y="86" class="sm m">Header 函数此刻</text>
+      <text x="30" y="104" class="sm m">一次都没有被调用</text>
+
+      <line x1="315" y1="78" x2="352" y2="78" class="ln"/>
+      <polygon points="352,74 352,82 360,78" class="hd"/>
+      <text x="318" y="68" class="lbl">仅仅得到</text>
+
+      <rect x="360" y="40" width="240" height="76" rx="2" class="box-r"/>
+      <text x="375" y="64" class="sm">{ type: Header,</text>
+      <text x="375" y="82" class="sm">&nbsp;&nbsp;props: {},</text>
+      <text x="375" y="100" class="sm">&nbsp;&nbsp;key: null }</text>
+
+      <line x1="600" y1="78" x2="637" y2="78" class="ln-soft"/>
+      <polygon points="637,74 637,82 645,78" class="m"/>
+      <text x="645" y="72" class="lbl">存进变量、放进数组、</text>
+      <text x="645" y="90" class="lbl">当参数传，都无副作用</text>
+
+      <text x="15" y="160" class="ttl">② 只有挂进返回的树，React 才会调用它</text>
+
+      <rect x="15" y="180" width="300" height="52" rx="2" class="box-p"/>
+      <text x="30" y="204" class="sm">return &lt;div&gt;{header}&lt;/div&gt;;</text>
+      <text x="30" y="222" class="sm m">元素进入渲染树</text>
+
+      <line x1="315" y1="206" x2="352" y2="206" class="ln a"/>
+      <polygon points="352,202 352,210 360,206" class="af"/>
+
+      <rect x="360" y="180" width="240" height="52" rx="2" class="box-a"/>
+      <text x="375" y="204" class="sm">React 看到 type 是函数</text>
+      <text x="375" y="222" class="sm">→ 调用 Header(props)</text>
+
+      <line x1="600" y1="206" x2="637" y2="206" class="ln a"/>
+      <polygon points="637,202 637,210 645,206" class="af"/>
+
+      <rect x="645" y="180" width="240" height="52" rx="2" class="box"/>
+      <text x="660" y="204" class="sm">得到子树，继续往下</text>
+      <text x="660" y="222" class="sm">递归，直到全是宿主标签</text>
+
+      <line x1="15" y1="256" x2="885" y2="256" class="ln-soft dash"/>
+      <text x="15" y="280" class="lbl">推论一：条件渲染只是"要不要把这个对象放进树里"，所以 cond &amp;&amp; &lt;X/&gt; 和三元运算都天然成立。</text>
+      <text x="15" y="300" class="lbl">推论二：&lt;Header /&gt; 每次渲染都是<tspan class="af">新对象</tspan>，所以不能用 === 比较两次渲染的元素来判断"有没有变"。</text>
+      <text x="15" y="320" class="lbl">推论三：Vue 模板里 &lt;Header /&gt; 由编译器生成 createVNode 调用，性质完全一样——描述，不是实例。</text>
+    </svg>
+    <figcaption>初学者最常见的误解是"写了标签＝组件跑起来了"。真相是：写标签只是造了个对象，React 拿到这个对象后才决定要不要调用它、调用几次。</figcaption>
+  </figure>
+
+  <h3>语法对照</h3>
+  <div class="tw"><table>
+    <thead><tr><th>要做的事</th><th>React（JS 表达式）</th><th>Vue（模板指令）</th></tr></thead>
+    <tbody>
+      <tr><td>插值</td><td><code>{name}</code></td><td><code>{{ name }}</code></td></tr>
+      <tr><td>二选一</td><td><code>{ok ? &lt;A/&gt; : &lt;B/&gt;}</code></td><td><code>v-if / v-else</code></td></tr>
+      <tr><td>有则显示</td><td><code>{ok &amp;&amp; &lt;A/&gt;}</code></td><td><code>v-if="ok"</code></td></tr>
+      <tr><td>显示但隐藏</td><td><code>style={{display: ok?"":"none"}}</code></td><td><code>v-show="ok"</code></td></tr>
+      <tr><td>列表</td><td><code>{list.map(x =&gt; &lt;li key={x.id}&gt;)}</code></td><td><code>v-for="x in list" :key="x.id"</code></td></tr>
+      <tr><td>不产生额外节点</td><td><code>&lt;&gt;…&lt;/&gt;</code>（Fragment）</td><td>模板天然支持多根节点</td></tr>
+      <tr><td>class 属性</td><td><code>className="a b"</code></td><td><code>:class="['a', {b: ok}]"</code></td></tr>
+      <tr><td>label 关联</td><td><code>htmlFor="id"</code></td><td><code>for="id"</code>（原样）</td></tr>
+      <tr><td>内联样式</td><td><code>style={{fontSize: 24}}</code>（对象）</td><td><code>:style="{fontSize:'24px'}"</code></td></tr>
+      <tr><td>自定义属性</td><td><code>data-size="XL"</code>（原样保留）</td><td>同左</td></tr>
+    </tbody>
+  </table></div>
+  <p>右边那些 <code>v-*</code> 是 Vue 编译器认识的<strong>特殊标记</strong>；左边则没有任何特殊标记，全是 JavaScript。这就是"JSX 不是模板"的实际含义：
+  你不需要框架给你提供 <code>v-for</code>，因为 <code>Array.prototype.map</code> 已经在那儿了。代价是模板里能写出任意复杂的逻辑，需要靠约定来克制。</p>
+
+  <h3>条件渲染的三种写法</h3>
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · Welcome.tsx</div>
+<pre><code class="language-typescript">// 写法 1：提前算好，存进变量（最好读）
+function Welcome({ loggedIn }: { loggedIn: boolean }) {
+  const header = loggedIn ? &lt;Header /&gt; : &lt;Login /&gt;;
+  return &lt;div&gt;{header}&lt;/div&gt;;
+}
+
+// 写法 2：只在为真时出现
+function Welcome2({ loggedIn }: { loggedIn: boolean }) {
+  return &lt;div&gt;{loggedIn &amp;&amp; &lt;Header /&gt;}&lt;/div&gt;;
+}
+
+// 写法 3：行内三元（分支短时用）
+function Welcome3({ loggedIn }: { loggedIn: boolean }) {
+  return &lt;div&gt;{loggedIn ? &lt;Header /&gt; : &lt;Login /&gt;}&lt;/div&gt;;
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · Welcome.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+defineProps&lt;{ loggedIn: boolean }&gt;();
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;!-- 写法 1/3 合一：v-if / v-else --&gt;
+  &lt;div&gt;
+    &lt;Header v-if="loggedIn" /&gt;
+    &lt;Login v-else /&gt;
+  &lt;/div&gt;
+
+  &lt;!-- 写法 2：只有 v-if，没有 else --&gt;
+  &lt;div&gt;
+    &lt;Header v-if="loggedIn" /&gt;
+  &lt;/div&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--trap">
+    <b>&amp;&amp; 的经典陷阱</b>
+    <p><code>{count &amp;&amp; &lt;Badge/&gt;}</code> 在 <code>count === 0</code> 时会把 <strong>0 渲染到页面上</strong>——因为 <code>0 &amp;&amp; x</code> 求值为 <code>0</code>，而 React 会渲染数字。
+    要么写 <code>{count &gt; 0 &amp;&amp; …}</code>，要么写 <code>{count ? … : null}</code>。Vue 的 <code>v-if="count"</code> 不会有这个问题，因为它只判真假、不输出判断结果。</p>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li><code>{}</code> 里只能放<strong>表达式</strong>；需要语句就在 return 之前写，或者抽成函数。</li>
+      <li><code>&lt;X/&gt;</code> 产生一个描述对象，不等于执行了 <code>X</code>。</li>
+      <li>Fragment（<code>&lt;&gt;…&lt;/&gt;</code>）解决的是"必须单根"的限制；Vue 3 的模板本来就支持多根节点。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="sup-key.html"><small>← 上一篇</small>key 与协调算法</a>
+  <a class="next" href="ch04.html"><small>下一篇 →</small>组件、children 与组合</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

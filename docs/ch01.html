@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>从 createElement 到 DOM · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html" class="on" aria-current="page"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html" class="on" aria-current="page"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch01">
+  <div class="ch__num">Chapter 01</div>
+  <h2>从 createElement 到 DOM</h2>
+  <p class="ch__sub">本章唯一要弄懂的事：你写的标签，经过哪几道手，才变成屏幕上的元素。</p>
+  <div class="ch__files">chapter01/Listing0101.html · HelloWorld.js · Listing0103.js</div>
+
+  <h3>原书清单在做什么</h3>
+  <p>第一个例子用两个 <code>&lt;script&gt;</code> 从 CDN 引入 react 和 react-dom，然后手写 <code>React.createElement</code>——
+  故意不用 JSX，好让你看见 JSX 底下是什么：</p>
+  <pre><code class="language-javascript">// chapter01/HelloWorld.js —— 原书写法
+class HelloWorld extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { personName: "World" };
+  }
+  render() {
+    return React.createElement("h1", null, "Hello, " + this.state.personName);
+  }
+}
+ReactDOM.render(React.createElement(HelloWorld), document.querySelector("#app"));</code></pre>
+  <p>这段代码今天已经跑不起来了：<code>ReactDOM.render</code> 在 React 18 被移除。但它揭示的管线一个字都没变。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 310" role="img" aria-label="JSX 经编译器转成 jsx 函数调用，运行时产生不可变的 Element 对象，React 据此构建可变的 Fiber 节点，最后提交为真实 DOM">
+      <text x="15" y="20" class="lbl">构建时（Vite / Babel / SWC）</text>
+      <text x="380" y="20" class="lbl">运行时（React）</text>
+      <line x1="365" y1="30" x2="365" y2="290" class="ln-soft dash"/>
+
+      <rect x="15" y="56" width="150" height="52" rx="2" class="box-p"/>
+      <text x="90" y="80" text-anchor="middle" class="ttl">① JSX 源码</text>
+      <text x="90" y="98" text-anchor="middle" class="sm m">你手写的</text>
+      <text x="15" y="140" class="sm">&lt;h1&gt;Hello&lt;/h1&gt;</text>
+
+      <line x1="165" y1="82" x2="187" y2="82" class="ln"/>
+      <polygon points="187,78 187,86 195,82" class="hd"/>
+
+      <rect x="195" y="56" width="150" height="52" rx="2" class="box-p"/>
+      <text x="270" y="80" text-anchor="middle" class="ttl">② 编译产物</text>
+      <text x="270" y="98" text-anchor="middle" class="sm m">纯函数调用</text>
+      <text x="195" y="140" class="sm">jsx("h1", {…})</text>
+      <text x="195" y="158" class="sm m">不需要 import React</text>
+
+      <line x1="345" y1="82" x2="367" y2="82" class="ln"/>
+      <polygon points="367,78 367,86 375,82" class="hd"/>
+
+      <rect x="375" y="56" width="150" height="52" rx="2" class="box-r"/>
+      <text x="450" y="80" text-anchor="middle" class="ttl">③ Element</text>
+      <text x="450" y="98" text-anchor="middle" class="sm m">不可变的描述</text>
+      <text x="375" y="140" class="sm">{ type:"h1",</text>
+      <text x="375" y="156" class="sm">&nbsp;&nbsp;props:{…} }</text>
+      <text x="375" y="176" class="sm m">只是普通对象</text>
+
+      <line x1="525" y1="82" x2="547" y2="82" class="ln r"/>
+      <polygon points="547,78 547,86 555,82" class="rf"/>
+
+      <rect x="555" y="56" width="150" height="52" rx="2" class="box-r"/>
+      <text x="630" y="80" text-anchor="middle" class="ttl">④ Fiber</text>
+      <text x="630" y="98" text-anchor="middle" class="sm m">可变的工作单元</text>
+      <text x="555" y="140" class="sm">存 hooks / 上次</text>
+      <text x="555" y="156" class="sm">的结果 / 副作用</text>
+      <text x="555" y="176" class="sm m">可中断、可恢复</text>
+
+      <line x1="705" y1="82" x2="727" y2="82" class="ln r"/>
+      <polygon points="727,78 727,86 735,82" class="rf"/>
+
+      <rect x="735" y="56" width="150" height="52" rx="2" class="box"/>
+      <text x="810" y="80" text-anchor="middle" class="ttl">⑤ 真实 DOM</text>
+      <text x="810" y="98" text-anchor="middle" class="sm m">浏览器节点</text>
+      <text x="735" y="140" class="sm">&lt;h1&gt;Hello&lt;/h1&gt;</text>
+
+      <path d="M375 205 L375 232 L885 232 L885 205" class="ln-soft dash"/>
+      <text x="630" y="252" text-anchor="middle" class="lbl">③④⑤ 每次状态变化都重来一遍；①② 只在打包时发生一次</text>
+
+      <rect x="15" y="262" width="330" height="34" rx="2" class="box-a"/>
+      <text x="180" y="284" text-anchor="middle" class="sm">Vue 的模板同样在构建时编译成 render 函数</text>
+      <rect x="375" y="262" width="510" height="34" rx="2" class="box-p"/>
+      <text x="630" y="284" text-anchor="middle" class="sm">差别在 ③→④：Vue 直接把 VNode 交给 patch，没有 Fiber 这层可中断结构</text>
+    </svg>
+    <figcaption>Element 是"描述"，Fiber 是"施工记录"。initState、effect、上一次的 DOM 引用全挂在 Fiber 上，这就是为什么 Hooks 能在没有 <code>this</code> 的函数组件里记住东西。</figcaption>
+  </figure>
+
+  <h3>React 19 重写</h3>
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · main.tsx</div>
+<pre><code class="language-typescript">import { createRoot } from "react-dom/client";
+import { useState } from "react";
+
+function HelloWorld() {
+  const [name, setName] = useState("World");
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Hello {name}&lt;/h1&gt;
+      &lt;input
+        value={name}
+        onChange={(e) =&gt; setName(e.target.value)}
+      /&gt;
+    &lt;/&gt;
+  );
+}
+
+// 注意：不再是 ReactDOM.render
+createRoot(document.getElementById("app")!)
+  .render(&lt;HelloWorld /&gt;);</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · main.ts + App.vue</div>
+<pre><code class="language-html">// main.ts
+import { createApp } from "vue";
+import App from "./App.vue";
+createApp(App).mount("#app");
+
+&lt;!-- App.vue --&gt;
+&lt;script setup lang="ts"&gt;
+import { ref } from "vue";
+const name = ref("World");
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;h1&gt;Hello {{ name }}&lt;/h1&gt;
+  &lt;input v-model="name" /&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--new">
+    <b>三个已经变了的细节</b>
+    <p><strong>①</strong> 不用再写 <code>import React from "react"</code>——React 17 起的新 JSX transform 由编译器自动引入 <code>jsx()</code>。
+    <strong>②</strong> <code>createRoot</code> 返回的 root 可以 <code>.unmount()</code>，同一个页面能挂多个 root。
+    <strong>③</strong> 服务端渲染出来的页面用 <code>hydrateRoot</code>，不是 <code>createRoot</code>。</p>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>JSX 是语法糖，编译后就是函数调用；React Element 是普通不可变对象。</li>
+      <li>Fiber 是运行时的可变结构，Hooks 的数据就存在这里。</li>
+      <li>Vue 模板同样被编译，两者都没有"运行时解析字符串模板"这回事。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="index.html"><small>← 上一篇</small>怎么读这份笔记</a>
+  <a class="next" href="sup-key.html"><small>下一篇 →</small>key 与协调算法</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

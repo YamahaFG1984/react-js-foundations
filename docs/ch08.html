@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>受控与非受控表单 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html" class="on" aria-current="page"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html" class="on" aria-current="page"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch08">
+  <div class="ch__num">Chapter 08</div>
+  <h2>受控与非受控表单</h2>
+  <p class="ch__sub">"受控"这个词吓人，机制其实只有一个闭环。看懂这个环，也就看懂了 Vue 的 <code>v-model</code> 是什么糖。</p>
+  <div class="ch__files">chapter08/Uncontrolled1.js · Controlled1–4.js · SearchForm/ · BlogComment.js · SizeSelect.js · SignUpForm.js</div>
+
+  <h3>原书清单在做什么</h3>
+  <p><code>Controlled1.js</code> 是个反面教材：<code>&lt;input value="" /&gt;</code> 写死了 value 又没有 <code>onChange</code>，
+  于是输入框<strong>完全打不动字</strong>——这恰好证明了受控组件里 DOM 只是 state 的投影。
+  <code>Controlled2.js</code> 补上 <code>onChange</code> 才让它活过来。</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 370" role="img" aria-label="受控组件中 state 通过 value 写入 DOM，用户输入触发 onChange 把新值写回 state，形成闭环；非受控组件中值只存在 DOM 里，Vue 的 v-model 是这个闭环两条边的语法糖">
+      <text x="60" y="26" class="ttl">受控组件：一个闭环，DOM 里没有"真相"</text>
+
+      <rect x="60" y="60" width="220" height="54" rx="2" class="box-a"/>
+      <text x="170" y="83" text-anchor="middle" class="ttl">React state</text>
+      <text x="170" y="101" text-anchor="middle" class="sm">term = "hel"</text>
+
+      <line x1="280" y1="87" x2="612" y2="87" class="ln a"/>
+      <polygon points="612,83 612,91 620,87" class="af"/>
+      <text x="450" y="78" text-anchor="middle" class="lbl">value={term}　渲染时写进 DOM</text>
+
+      <rect x="620" y="60" width="220" height="54" rx="2" class="box-p"/>
+      <text x="730" y="83" text-anchor="middle" class="ttl">&lt;input&gt; 的 value</text>
+      <text x="730" y="101" text-anchor="middle" class="sm m">屏幕上显示 "hel"</text>
+
+      <line x1="730" y1="114" x2="730" y2="202" class="ln"/>
+      <polygon points="726,202 734,202 730,210" class="hd"/>
+      <text x="748" y="152" class="lbl">用户按下 "l"</text>
+      <text x="748" y="170" class="lbl">DOM 产生 input 事件</text>
+
+      <rect x="620" y="210" width="220" height="54" rx="2" class="box-p"/>
+      <text x="730" y="233" text-anchor="middle" class="ttl">onChange(e)</text>
+      <text x="730" y="251" text-anchor="middle" class="sm m">e.target.value === "hell"</text>
+
+      <line x1="620" y1="237" x2="288" y2="237" class="ln a"/>
+      <polygon points="288,233 288,241 280,237" class="af"/>
+      <text x="450" y="228" text-anchor="middle" class="lbl">setTerm("hell")</text>
+
+      <rect x="60" y="210" width="220" height="54" rx="2" class="box-a"/>
+      <text x="170" y="233" text-anchor="middle" class="ttl">setTerm</text>
+      <text x="170" y="251" text-anchor="middle" class="sm">排队 → 重渲染</text>
+
+      <line x1="170" y1="210" x2="170" y2="122" class="ln a"/>
+      <polygon points="166,122 174,122 170,114" class="af"/>
+      <text x="158" y="158" text-anchor="end" class="lbl">回到起点，</text>
+      <text x="158" y="176" text-anchor="end" class="lbl">带着新值再画一遍</text>
+
+      <rect x="330" y="128" width="240" height="78" rx="2" class="box-r"/>
+      <text x="450" y="150" text-anchor="middle" class="sm">真相只有一份：state</text>
+      <text x="450" y="170" text-anchor="middle" class="sm m">DOM 里的值是它的投影</text>
+      <text x="450" y="190" text-anchor="middle" class="sm m">所以能改写、格式化、拒绝</text>
+
+      <line x1="60" y1="292" x2="885" y2="292" class="ln-soft dash"/>
+
+      <rect x="60" y="306" width="390" height="52" rx="2" class="box-p"/>
+      <text x="74" y="326" class="sm">非受控：去掉 value 和 onChange 这两条边</text>
+      <text x="74" y="344" class="sm m">值只存在 DOM 里，用 ref 在提交时读一次（BlogComment.js 就是这种）</text>
+
+      <rect x="470" y="306" width="415" height="52" rx="2" class="box-v"/>
+      <text x="484" y="326" class="sm">Vue 的 v-model = 上面那条下行边 + 那条上行边</text>
+      <text x="484" y="344" class="sm m">编译后就是 :value="term" @input="term = $event.target.value"</text>
+    </svg>
+    <figcaption>受控组件的本质是"让 React 掌握每一次按键"。代价是每敲一个字符就重渲染一次；收益是你可以在中途改写输入（转大写、限制字符、格式化手机号）。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · SignUp.tsx（受控）</div>
+<pre><code class="language-typescript">import { useState } from "react";
+
+export default function SignUp() {
+  const [email, setEmail] = useState("");
+
+  return (
+    &lt;form&gt;
+      &lt;label&gt;
+        Enter your email address:
+        &lt;input
+          type="email"
+          value={email}
+          // 中途改写输入：全部转小写
+          onChange={(e) =&gt; setEmail(e.target.value.toLowerCase())}
+        /&gt;
+      &lt;/label&gt;
+      &lt;p&gt;Your email address: {email}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · SignUp.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref } from "vue";
+const email = ref("");
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;form&gt;
+    &lt;label&gt;
+      Enter your email address:
+      &lt;!-- v-model 自带 .trim / .number / .lazy 修饰符 --&gt;
+      &lt;input type="email" v-model.trim="email" /&gt;
+    &lt;/label&gt;
+    &lt;p&gt;Your email address: {{ email }}&lt;/p&gt;
+  &lt;/form&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <h4>非受控：值留在 DOM 里，提交时读一次</h4>
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · BlogComment.tsx</div>
+<pre><code class="language-typescript">import { useState, useRef, type FormEvent } from "react";
+
+export default function BlogComment() {
+  const [comments, setComments] = useState&lt;string[]&gt;([]);
+  const textAreaRef = useRef&lt;HTMLTextAreaElement&gt;(null);
+
+  function recordComment(e: FormEvent) {
+    e.preventDefault();
+    const v = textAreaRef.current?.value ?? "";
+    if (v) setComments([...comments, v]);
+  }
+
+  return (
+    &lt;form onSubmit={recordComment}&gt;
+      &lt;textarea ref={textAreaRef} defaultValue="" /&gt;
+      &lt;button&gt;Submit&lt;/button&gt;
+      {/* 只在末尾追加、项本身无状态 —— 这种列表用下标当 key 才安全，见「补 A」 */}
+      {comments.map((c, i) =&gt; &lt;p key={i}&gt;{c}&lt;/p&gt;)}
+    &lt;/form&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · BlogComment.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref, useTemplateRef } from "vue";
+
+const comments = ref&lt;string[]&gt;([]);
+// Vue 3.5+ 推荐 useTemplateRef
+const box = useTemplateRef&lt;HTMLTextAreaElement&gt;("box");
+
+function recordComment() {
+  const v = box.value?.value ?? "";
+  if (v) comments.value.push(v);
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;form @submit.prevent="recordComment"&gt;
+    &lt;textarea ref="box" /&gt;
+    &lt;button&gt;Submit&lt;/button&gt;
+    &lt;p v-for="(c, i) in comments" :key="i"&gt;{{ c }}&lt;/p&gt;
+  &lt;/form&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--new">
+    <b>React 19 新增：Form Actions</b>
+    <p>原书用 <code>onSubmit</code> + <code>preventDefault</code> 手工处理提交。React 19 给 <code>&lt;form&gt;</code> 加了
+    <code>action</code> 属性：传一个函数进去，React 自动阻止默认行为、把表单数据打包成 <code>FormData</code>、
+    在提交期间维护 pending 状态、提交完成后重置表单。配套的 <code>useActionState</code> 把
+    "待处理 / 结果 / 错误"三件事收进一个 Hook。</p>
+  </div>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · 用 Action 重写提交</div>
+<pre><code class="language-typescript">import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+
+async function subscribe(prev: string | null, formData: FormData) {
+  const email = String(formData.get("email") ?? "");
+  if (!email.includes("@")) return "请填写有效邮箱";
+  await fetch("/api/subscribe", { method: "POST", body: formData });
+  return "订阅成功";
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus();   // 读所在 form 的状态
+  return &lt;button disabled={pending}&gt;
+    {pending ? "提交中…" : "Sign Up"}
+  &lt;/button&gt;;
+}
+
+export default function SignUpForm() {
+  const [message, formAction] = useActionState(subscribe, null);
+  return (
+    &lt;form action={formAction}&gt;
+      &lt;input name="email" type="email" /&gt;
+      &lt;SubmitButton /&gt;
+      {message &amp;&amp; &lt;p&gt;{message}&lt;/p&gt;}
+    &lt;/form&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · 手写等价逻辑</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref } from "vue";
+
+const email = ref("");
+const pending = ref(false);
+const message = ref&lt;string | null&gt;(null);
+
+// Vue 没有内置 Action 概念，pending 自己管
+async function subscribe() {
+  if (!email.value.includes("@")) {
+    message.value = "请填写有效邮箱";
+    return;
+  }
+  pending.value = true;
+  try {
+    await fetch("/api/subscribe", {
+      method: "POST",
+      body: JSON.stringify({ email: email.value }),
+    });
+    message.value = "订阅成功";
+    email.value = "";
+  } finally {
+    pending.value = false;
+  }
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;form @submit.prevent="subscribe"&gt;
+    &lt;input v-model="email" type="email" /&gt;
+    &lt;button :disabled="pending"&gt;
+      {{ pending ? "提交中…" : "Sign Up" }}
+    &lt;/button&gt;
+    &lt;p v-if="message"&gt;{{ message }}&lt;/p&gt;
+  &lt;/form&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>受控 = <code>value</code> 下行 + <code>onChange</code> 上行的闭环；缺一条边输入框就会失灵。</li>
+      <li>非受控 = 值留在 DOM，用 ref 读；适合文件上传、第三方组件、只在提交时才关心值的场景。</li>
+      <li><code>v-model</code> 就是这个闭环的两条边被编译器补齐了。</li>
+      <li>React 19 的 <code>&lt;form action&gt;</code> + <code>useActionState</code> + <code>useFormStatus</code> 把提交态标准化了，值得直接上手。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch07.html"><small>← 上一篇</small>合成事件与委托</a>
+  <a class="next" href="ch09.html"><small>下一篇 →</small>Ref：渲染之外的盒子</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

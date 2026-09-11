@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>组件、children 与组合 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html" class="on" aria-current="page"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html" class="on" aria-current="page"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch04">
+  <div class="ch__num">Chapter 04</div>
+  <h2>组件、children 与组合</h2>
+  <p class="ch__sub">这一章原书用了大量 class 组件。今天 class 已经不是主流，但它留下的两个概念——组合与重渲染传播——一天也没过时。</p>
+  <div class="ch__files">chapter04/ToDoClass.js · ToDoFunction.js · ThingsThatILike.js · clone-element/ · ReactMemoExample.js · LeakyCounter.js</div>
+
+  <h3>class 与函数，写法之外的差别</h3>
+  <p>原书把同一个待办列表写了两遍（<code>ToDoClass.js</code> / <code>ToDoFunction.js</code>）。除了少打很多字，函数组件真正的区别在于：
+  <strong>它没有 <code>this</code>，所以不需要 <code>bind</code>；它每次渲染都是一次全新的函数调用</strong>。
+  原书 <code>UnboundFunction.js</code> 与 <code>BoundFunction.js</code> 演示的那个 <code>this</code> 陷阱，在函数组件里根本不存在。</p>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · ToDo.tsx（函数组件 + TS）</div>
+<pre><code class="language-typescript">import { useState, type FormEvent } from "react";
+
+type Todo = { id: string; text: string };
+
+export default function ToDo() {
+  const [item, setItem] = useState("");
+  const [list, setList] = useState&lt;Todo[]&gt;([]);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!item.trim()) return;
+    // 造新数组，并给每条数据一个稳定 id（为什么：见「补 A」）
+    setList([...list, { id: crypto.randomUUID(), text: item }]);
+    setItem("");
+  }
+
+  return (
+    &lt;form onSubmit={handleSubmit}&gt;
+      &lt;input
+        value={item}
+        onChange={(e) =&gt; setItem(e.target.value)}
+        placeholder="what to do?"
+      /&gt;
+      &lt;button type="submit"&gt;Add&lt;/button&gt;
+      {list.map((todo) =&gt; (
+        &lt;p key={todo.id}&gt;{todo.text}&lt;/p&gt;
+      ))}
+    &lt;/form&gt;
+  );
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · ToDo.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+import { ref } from "vue";
+
+const item = ref("");
+const list = ref&lt;{ id: string; text: string }[]&gt;([]);
+
+function handleSubmit() {
+  if (!item.value.trim()) return;
+  // 可以直接改；key 同样要用稳定 id
+  list.value.push({ id: crypto.randomUUID(), text: item.value });
+  item.value = "";
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;form @submit.prevent="handleSubmit"&gt;
+    &lt;input v-model="item" placeholder="what to do?" /&gt;
+    &lt;button type="submit"&gt;Add&lt;/button&gt;
+    &lt;p v-for="todo in list" :key="todo.id"&gt;{{ todo.text }}&lt;/p&gt;
+  &lt;/form&gt;
+&lt;/template&gt;</code></pre></div>
+  </div>
+
+  <div class="note note--trap">
+    <b>第一个真正的分歧：能不能改</b>
+    <p>Vue 那边 <code>list.value.push(...)</code> 直接生效——因为数组被 Proxy 包过，改动会被拦截并通知订阅者。
+    React 这边 <strong>必须造一个新数组</strong>：<code>setList([...list, newTodo])</code>。
+    如果你写 <code>list.push(newTodo); setList(list)</code>，React 拿到的是同一个引用，判定"没变"，界面不会更新。
+    这不是 React 笨，而是它靠"引用是否改变"来判断，代价换来的是可预测性——数据永远不会在你没注意的地方被偷偷改掉。</p>
+  </div>
+
+  <h3>组合：children 就是一个普通 prop</h3>
+  <p>原书 <code>ThingsThatILike.js</code> 把一个 <code>&lt;ul&gt;</code> 塞进 <code>&lt;ThingsThatAreFunny&gt;</code> 里。这个"塞进去"的动作，机制上非常朴素：</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 350" role="img" aria-label="父组件标签之间的内容被收集为 props.children 传给子组件，子组件决定把它渲染在哪个位置，等价于 Vue 的默认插槽">
+      <rect x="15" y="44" width="272" height="140" rx="2" class="box-p"/>
+      <text x="28" y="36" class="ttl">① 调用方写的 JSX</text>
+      <text x="28" y="68" class="sm">&lt;ThingsThatAreFunny&gt;</text>
+      <text x="28" y="90" class="sm af">&nbsp;&nbsp;&lt;ul&gt;</text>
+      <text x="28" y="108" class="sm af">&nbsp;&nbsp;&nbsp;&nbsp;&lt;li&gt;&lt;Joke id="0" /&gt;&lt;/li&gt;</text>
+      <text x="28" y="126" class="sm af">&nbsp;&nbsp;&nbsp;&nbsp;&lt;li&gt;&lt;Joke id="1" /&gt;&lt;/li&gt;</text>
+      <text x="28" y="144" class="sm af">&nbsp;&nbsp;&lt;/ul&gt;</text>
+      <text x="28" y="166" class="sm">&lt;/ThingsThatAreFunny&gt;</text>
+
+      <line x1="287" y1="112" x2="322" y2="112" class="ln a"/>
+      <polygon points="322,108 322,116 330,112" class="af"/>
+      <text x="288" y="102" class="lbl">编译器收集</text>
+
+      <rect x="330" y="44" width="216" height="140" rx="2" class="box-a"/>
+      <text x="343" y="36" class="ttl">② 变成一个 prop</text>
+      <text x="343" y="76" class="sm">props = {</text>
+      <text x="343" y="96" class="sm">&nbsp;&nbsp;children: &lt;ul&gt;…&lt;/ul&gt;</text>
+      <text x="343" y="116" class="sm">}</text>
+      <text x="343" y="146" class="sm m">和 title、size 这些</text>
+      <text x="343" y="164" class="sm m">属性没有任何区别</text>
+
+      <line x1="546" y1="112" x2="581" y2="112" class="ln"/>
+      <polygon points="581,108 581,116 589,112" class="hd"/>
+
+      <rect x="589" y="44" width="296" height="140" rx="2" class="box-r"/>
+      <text x="602" y="36" class="ttl">③ 组件决定放哪里</text>
+      <text x="602" y="72" class="sm">function ThingsThatAreFunny(p) {</text>
+      <text x="602" y="92" class="sm">&nbsp;&nbsp;return (&lt;&gt;</text>
+      <text x="602" y="110" class="sm">&nbsp;&nbsp;&nbsp;&nbsp;&lt;h1&gt;Here are some…&lt;/h1&gt;</text>
+      <text x="602" y="128" class="sm af">&nbsp;&nbsp;&nbsp;&nbsp;{p.children}</text>
+      <text x="602" y="146" class="sm">&nbsp;&nbsp;&lt;/&gt;);</text>
+      <text x="602" y="164" class="sm">}</text>
+
+      <line x1="15" y1="212" x2="885" y2="212" class="ln-soft dash"/>
+      <text x="15" y="238" class="ttl">因为 children 只是普通值，所以这些都成立：</text>
+      <text x="15" y="262" class="lbl">· 可以不渲染它（条件插槽）　· 可以渲染两次　· 可以用 React.Children 遍历、用 cloneElement 给每个子节点注入 onClick</text>
+      <text x="15" y="282" class="lbl">· 可以同时传多个"插槽"：&lt;Layout header={&lt;Nav/&gt;} sidebar={&lt;Menu/&gt;} /&gt;　—— 这就是 React 版的具名插槽</text>
+
+      <rect x="15" y="298" width="425" height="40" rx="2" class="box-r"/>
+      <text x="30" y="323" class="sm">React：children / element prop　—— 就是值，无需专门语法</text>
+      <rect x="460" y="298" width="425" height="40" rx="2" class="box-v"/>
+      <text x="475" y="323" class="sm">Vue：&lt;slot /&gt; / &lt;slot name="x"/&gt; + &lt;template #x&gt;　—— 专门语法</text>
+    </svg>
+    <figcaption>React 不需要"插槽"这个概念，因为 UI 片段本来就是可以到处传递的值。Vue 需要 <code>&lt;slot&gt;</code>，是因为模板里没法把一段模板当作变量传递。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · 默认插槽 + 具名插槽</div>
+<pre><code class="language-typescript">import type { ReactNode } from "react";
+
+type Props = {
+  title: ReactNode;          // 具名插槽
+  children: ReactNode;       // 默认插槽
+  footer?: ReactNode;        // 可选插槽
+};
+
+function Panel({ title, children, footer }: Props) {
+  return (
+    &lt;section&gt;
+      &lt;h2&gt;{title}&lt;/h2&gt;
+      {children}
+      {footer &amp;&amp; &lt;footer&gt;{footer}&lt;/footer&gt;}
+    &lt;/section&gt;
+  );
+}
+
+// 使用
+&lt;Panel title={&lt;b&gt;笑话集&lt;/b&gt;} footer={&lt;small&gt;完&lt;/small&gt;}&gt;
+  &lt;ul&gt;&lt;li&gt;…&lt;/li&gt;&lt;/ul&gt;
+&lt;/Panel&gt;</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · Panel.vue</div>
+<pre><code class="language-html">&lt;script setup lang="ts"&gt;
+// 插槽不用声明类型也能用；要类型时：
+defineSlots&lt;{
+  default(): any;
+  title(): any;
+  footer?(): any;
+}&gt;();
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;section&gt;
+    &lt;h2&gt;&lt;slot name="title" /&gt;&lt;/h2&gt;
+    &lt;slot /&gt;
+    &lt;footer v-if="$slots.footer"&gt;&lt;slot name="footer" /&gt;&lt;/footer&gt;
+  &lt;/section&gt;
+&lt;/template&gt;
+
+&lt;!-- 使用 --&gt;
+&lt;Panel&gt;
+  &lt;template #title&gt;&lt;b&gt;笑话集&lt;/b&gt;&lt;/template&gt;
+  &lt;ul&gt;&lt;li&gt;…&lt;/li&gt;&lt;/ul&gt;
+  &lt;template #footer&gt;&lt;small&gt;完&lt;/small&gt;&lt;/template&gt;
+&lt;/Panel&gt;</code></pre></div>
+  </div>
+
+  <h3>重渲染是会传染的</h3>
+  <p>原书用 <code>PureComponent</code> 和 <code>React.memo</code> 处理这个问题。先看清楚问题本身：</p>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 330" role="img" aria-label="父组件重渲染时默认会递归重跑所有子组件；用 memo 包裹的子组件在 props 浅比较相等时会跳过，连同它下面的整棵子树">
+      <text x="15" y="22" class="ttl">默认行为：父组件重跑 → 整棵子树都重跑</text>
+      <rect x="15" y="40" width="150" height="46" rx="2" class="box-a"/>
+      <text x="90" y="60" text-anchor="middle" class="sm">Parent</text>
+      <text x="90" y="77" text-anchor="middle" class="sm">state 变了</text>
+      <line x1="165" y1="63" x2="197" y2="63" class="ln a"/>
+      <polygon points="197,59 197,67 205,63" class="af"/>
+      <rect x="205" y="40" width="150" height="46" rx="2" class="box-r"/>
+      <text x="280" y="68" text-anchor="middle" class="sm">Child A 重跑</text>
+      <line x1="355" y1="63" x2="387" y2="63" class="ln r"/>
+      <polygon points="387,59 387,67 395,63" class="rf"/>
+      <rect x="395" y="40" width="150" height="46" rx="2" class="box-r"/>
+      <text x="470" y="68" text-anchor="middle" class="sm">Child B 重跑</text>
+      <line x1="545" y1="63" x2="577" y2="63" class="ln r"/>
+      <polygon points="577,59 577,67 585,63" class="rf"/>
+      <rect x="585" y="40" width="150" height="46" rx="2" class="box-r"/>
+      <text x="660" y="68" text-anchor="middle" class="sm">Child C 重跑</text>
+      <text x="750" y="68" class="lbl">props 没变也照跑</text>
+
+      <line x1="15" y1="110" x2="885" y2="110" class="ln-soft dash"/>
+
+      <text x="15" y="140" class="ttl">加上 memo：props 浅比较相等 → 整棵子树被剪掉</text>
+      <rect x="15" y="158" width="150" height="46" rx="2" class="box-a"/>
+      <text x="90" y="178" text-anchor="middle" class="sm">Parent</text>
+      <text x="90" y="195" text-anchor="middle" class="sm">state 变了</text>
+      <line x1="165" y1="181" x2="197" y2="181" class="ln a"/>
+      <polygon points="197,177 197,185 205,181" class="af"/>
+      <rect x="205" y="158" width="150" height="46" rx="2" class="box-v"/>
+      <text x="280" y="178" text-anchor="middle" class="sm">memo(A)</text>
+      <text x="280" y="195" text-anchor="middle" class="sm">props 相同 → 跳过</text>
+      <line x1="355" y1="181" x2="387" y2="181" class="ln-soft dot"/>
+      <rect x="395" y="158" width="150" height="46" rx="2" class="box-p"/>
+      <text x="470" y="186" text-anchor="middle" class="sm m">B 根本没被调用</text>
+      <line x1="545" y1="181" x2="577" y2="181" class="ln-soft dot"/>
+      <rect x="585" y="158" width="150" height="46" rx="2" class="box-p"/>
+      <text x="660" y="186" text-anchor="middle" class="sm m">C 根本没被调用</text>
+
+      <line x1="15" y1="228" x2="885" y2="228" class="ln-soft dash"/>
+      <text x="15" y="254" class="lbl">浅比较：逐个 prop 用 Object.is 比。所以 &lt;A onClick={() =&gt; …} /&gt; 里每次新建的函数会让 memo 永远失效。</text>
+      <text x="15" y="274" class="lbl">这正是 useCallback / useMemo 存在的原因——它们不是"性能优化"，而是"保住引用稳定，好让 memo 生效"。</text>
+      <text x="15" y="300" class="ttl af">React Compiler 上线后，这三件事由编译器自动完成，手写 memo/useMemo/useCallback 将成为少数情况。</text>
+      <text x="15" y="320" class="lbl">Vue 这边不存在这个问题：子组件的 render effect 只订阅它真正读过的响应式数据，父组件更新不会自动波及。</text>
+    </svg>
+    <figcaption>"父更新则子全部重跑"是 React 的默认语义，不是 bug。<code>memo</code> 是在这条默认路径上开一个闸门，条件是 props 引用稳定。</figcaption>
+  </figure>
+
+  <div class="note note--vue">
+    <b>Vue 侧没有对应物</b>
+    <p>Vue 组件的更新由依赖追踪驱动：<code>Child</code> 只有在它读过的响应式数据变化时才重新渲染。
+    所以 Vue 里没有 <code>memo</code>、没有 <code>useCallback</code>，也很少有人讨论"重渲染传播"。
+    代价是你要记得把状态放进 <code>ref</code>/<code>reactive</code>，否则它根本不在追踪范围内。</p>
+  </div>
+
+  <h3>顺带一提：LeakyCounter</h3>
+  <p>原书 <code>LeakyCounter.js</code> 在 <code>componentDidMount</code> 里开了个 <code>setInterval</code> 却没清理，组件卸载后定时器还在跑并调用 <code>setState</code>；
+  <code>NoLeakCounter.js</code> 补上 <code>componentWillUnmount</code> 修好了它。函数组件里这对生命周期合并成了 <code>useEffect</code> 的返回值，
+  详见 <a href="ch11.html">第 11 章的时序图</a>。</p>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>写新代码不用 class；<code>this</code> 绑定问题随之消失。</li>
+      <li>React 的状态更新必须产生<strong>新引用</strong>；Vue 可以就地修改。</li>
+      <li><code>children</code> 只是一个 prop，因此组合能力天然存在，不需要插槽语法。</li>
+      <li><code>memo</code> 依赖 props 引用稳定；React Compiler 正在把这件事自动化。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch03.html"><small>← 上一篇</small>JSX 不是模板</a>
+  <a class="next" href="ch06.html"><small>下一篇 →</small>Props 与 State</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

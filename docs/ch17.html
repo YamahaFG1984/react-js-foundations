@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context 穿透组件树 · React 机制图解</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<details class="toc__mob">
+  <summary>目录 / Contents</summary>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html" class="on" aria-current="page"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</details>
+
+<div class="shell">
+<aside class="toc">
+  <div class="toc__brand"><a href="index.html" style="all:unset;cursor:pointer">React JS Foundations<br>逐章图解 · 附 Vue 3 对照</a></div>
+  <nav>
+    <a href="index.html"><i>00</i><span>怎么读这份笔记</span></a>
+    <a href="ch01.html"><i>01</i><span>从 createElement 到 DOM</span></a>
+    <a href="sup-key.html"><i>补A</i><span>key 与协调算法</span></a>
+    <a href="ch03.html"><i>03</i><span>JSX 不是模板</span></a>
+    <a href="ch04.html"><i>04</i><span>组件、children 与组合</span></a>
+    <a href="ch06.html"><i>06</i><span>Props 与 State</span></a>
+    <a href="sup-identity.html"><i>补B</i><span>状态住在树的哪个位置</span></a>
+    <a href="ch07.html"><i>07</i><span>合成事件与委托</span></a>
+    <a href="ch08.html"><i>08</i><span>受控与非受控表单</span></a>
+    <a href="ch09.html"><i>09</i><span>Ref：渲染之外的盒子</span></a>
+    <a href="ch10.html"><i>10</i><span>样式与作用域</span></a>
+    <a href="ch11.html"><i>11</i><span>Hooks 的规则从何而来</span></a>
+    <a href="sup-effect.html"><i>补C</i><span>大部分 useEffect 都不该存在</span></a>
+    <a href="ch12.html"><i>12</i><span>路由：URL 即状态</span></a>
+    <a href="ch13.html"><i>13</i><span>错误边界</span></a>
+    <a href="ch15.html"><i>15</i><span>工具链：webpack → Vite</span></a>
+    <a href="ch16.html"><i>16</i><span>数据获取与持久化</span></a>
+    <a href="ch17.html" class="on" aria-current="page"><i>17</i><span>Context 穿透组件树</span></a>
+    <a href="ch18.html"><i>18</i><span>Portal 跳出 DOM 层级</span></a>
+    <a href="ch19.html"><i>19</i><span>并发特性与下一步</span></a>
+    <hr>
+    <a href="cheat.html"><i>★</i><span>React ↔ Vue 速查表</span></a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<section class="ch" id="ch17">
+  <div class="ch__num">Chapter 17</div>
+  <h2>Context 穿透组件树</h2>
+  <p class="ch__sub">原书用同一个 Dashboard 写了三遍：逐层传 props、用 Context、用组合。这三种解法值得放在一起看——因为大多数人只学了第二种。</p>
+  <div class="ch__files">chapter17/PropDrilling.js · DashboardApp.js · DashboardAppContext.js · DashboardAppComposition.js · contexts/UnitsContext.js</div>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 900 400" role="img" aria-label="同一棵五层组件树的三种数据传递方式：逐层传递 props、用 Context 跨层读取、用组合把已填好数据的元素从顶层传下去">
+      <text x="15" y="22" class="ttl">① 逐层传 props</text>
+      <text x="315" y="22" class="ttl">② Context</text>
+      <text x="615" y="22" class="ttl">③ 组合（composition）</text>
+      <line x1="295" y1="10" x2="295" y2="300" class="ln-soft dash"/>
+      <line x1="595" y1="10" x2="595" y2="300" class="ln-soft dash"/>
+
+      <rect x="15" y="36" width="230" height="30" rx="2" class="box-a"/>
+      <text x="28" y="56" class="sm">App　username 住这里</text>
+      <line x1="60" y1="66" x2="60" y2="80" class="ln"/><polygon points="56,80 64,80 60,86" class="hd"/>
+      <text x="72" y="78" class="lbl">username</text>
+      <rect x="15" y="86" width="230" height="30" rx="2" class="box-p"/>
+      <text x="28" y="106" class="sm m">Dashboard　只是过路</text>
+      <line x1="60" y1="116" x2="60" y2="130" class="ln"/><polygon points="56,130 64,130 60,136" class="hd"/>
+      <text x="72" y="128" class="lbl">username</text>
+      <rect x="15" y="136" width="230" height="30" rx="2" class="box-p"/>
+      <text x="28" y="156" class="sm m">Header　只是过路</text>
+      <line x1="60" y1="166" x2="60" y2="180" class="ln"/><polygon points="56,180 64,180 60,186" class="hd"/>
+      <text x="72" y="178" class="lbl">username</text>
+      <rect x="15" y="186" width="230" height="30" rx="2" class="box-p"/>
+      <text x="28" y="206" class="sm m">UserControls　只是过路</text>
+      <line x1="60" y1="216" x2="60" y2="230" class="ln"/><polygon points="56,230 64,230 60,236" class="hd"/>
+      <rect x="15" y="236" width="230" height="30" rx="2" class="box-r"/>
+      <text x="28" y="256" class="sm">WelcomeMessage　用它</text>
+      <text x="15" y="288" class="lbl af">中间三层被迫认识一个与自己无关的 prop</text>
+
+      <rect x="315" y="36" width="230" height="30" rx="2" class="box-a"/>
+      <text x="328" y="56" class="sm">App　&lt;Ctx value={…}&gt;</text>
+      <rect x="315" y="86" width="230" height="30" rx="2" class="box-p"/>
+      <text x="328" y="106" class="sm m">Dashboard　什么都不知道</text>
+      <rect x="315" y="136" width="230" height="30" rx="2" class="box-p"/>
+      <text x="328" y="156" class="sm m">Header　什么都不知道</text>
+      <rect x="315" y="186" width="230" height="30" rx="2" class="box-p"/>
+      <text x="328" y="206" class="sm m">UserControls　什么都不知道</text>
+      <rect x="315" y="236" width="230" height="30" rx="2" class="box-r"/>
+      <text x="328" y="256" class="sm">useContext(Ctx)</text>
+      <path d="M553 51 L575 51 L575 251 L553 251" class="ln a dash"/>
+      <polygon points="553,247 553,255 545,251" class="af"/>
+      <text x="440" y="288" text-anchor="middle" class="lbl">跨过所有中间层</text>
+
+      <rect x="615" y="36" width="270" height="46" rx="2" class="box-a"/>
+      <text x="628" y="56" class="sm">App 在这里就把内容组装好：</text>
+      <text x="628" y="74" class="sm">&lt;WelcomeMessage username={u} /&gt;</text>
+      <line x1="660" y1="82" x2="660" y2="96" class="ln"/><polygon points="656,96 664,96 660,102" class="hd"/>
+      <text x="672" y="94" class="lbl">children</text>
+      <rect x="615" y="102" width="270" height="30" rx="2" class="box-p"/>
+      <text x="628" y="122" class="sm m">Dashboard　{children}</text>
+      <line x1="660" y1="132" x2="660" y2="146" class="ln"/><polygon points="656,146 664,146 660,152" class="hd"/>
+      <rect x="615" y="152" width="270" height="30" rx="2" class="box-p"/>
+      <text x="628" y="172" class="sm m">Header　{children}</text>
+      <line x1="660" y1="182" x2="660" y2="196" class="ln"/><polygon points="656,196 664,196 660,202" class="hd"/>
+      <rect x="615" y="202" width="270" height="30" rx="2" class="box-p"/>
+      <text x="628" y="222" class="sm m">UserControls　{children}</text>
+      <line x1="660" y1="232" x2="660" y2="246" class="ln"/><polygon points="656,246 664,246 660,252" class="hd"/>
+      <rect x="615" y="252" width="270" height="30" rx="2" class="box-v"/>
+      <text x="628" y="272" class="sm">元素早就带着数据来了</text>
+      <text x="615" y="304" class="lbl vf">中间层只搬运 children，不认识任何业务 prop</text>
+
+      <line x1="15" y1="322" x2="885" y2="322" class="ln-soft dash"/>
+      <text x="15" y="346" class="lbl">怎么选：<tspan class="hd">传 1–2 层</tspan> → 就用 props，别过度设计。</text>
+      <text x="15" y="366" class="lbl"><tspan class="hd">中间层纯粹是容器</tspan> → 优先用组合，它比 Context 简单，而且不引入隐式依赖。</text>
+      <text x="15" y="386" class="lbl"><tspan class="hd">主题、语言、当前用户这类真·全局</tspan> → 才上 Context。频繁变化的值放 Context 会让所有消费者一起重渲染。</text>
+    </svg>
+    <figcaption>原书把三种写法平铺展示，容易让人以为 Context 是"更高级的答案"。实际顺序应该是：props → 组合 → Context，能不升级就不升级。</figcaption>
+  </figure>
+
+  <div class="vs">
+    <div class="pane pane--r"><div class="pane__hd">React 19 · UnitsContext.tsx</div>
+<pre><code class="language-typescript">import { createContext, useContext, useState,
+         type ReactNode } from "react";
+
+type Units = {
+  lengthUnit: "cm" | "inch";
+  tempUnit: "c" | "f";
+  setLengthUnit: (u: "cm" | "inch") =&gt; void;
+  setTempUnit: (u: "c" | "f") =&gt; void;
+};
+
+const UnitsContext = createContext&lt;Units | null&gt;(null);
+
+export function UnitsProvider({ children }: { children: ReactNode }) {
+  const [lengthUnit, setLengthUnit] = useState&lt;"cm" | "inch"&gt;("cm");
+  const [tempUnit, setTempUnit] = useState&lt;"c" | "f"&gt;("c");
+
+  // React 19：Context 本身就是 Provider，不用写 .Provider
+  return (
+    &lt;UnitsContext value={{ lengthUnit, tempUnit,
+                           setLengthUnit, setTempUnit }}&gt;
+      {children}
+    &lt;/UnitsContext&gt;
+  );
+}
+
+// 自定义 Hook 把"忘了套 Provider"变成明确的报错
+export function useUnits() {
+  const ctx = useContext(UnitsContext);
+  if (!ctx) throw new Error("useUnits 必须在 UnitsProvider 内使用");
+  return ctx;
+}</code></pre></div>
+    <div class="pane pane--v"><div class="pane__hd">Vue 3 · units.ts + provide/inject</div>
+<pre><code class="language-typescript">import { ref, provide, inject, type InjectionKey, type Ref } from "vue";
+
+type Units = {
+  lengthUnit: Ref&lt;"cm" | "inch"&gt;;
+  tempUnit: Ref&lt;"c" | "f"&gt;;
+};
+
+// InjectionKey 让 inject 的返回值自动带上类型
+export const UnitsKey: InjectionKey&lt;Units&gt; = Symbol("units");
+
+export function provideUnits() {
+  const lengthUnit = ref&lt;"cm" | "inch"&gt;("cm");
+  const tempUnit = ref&lt;"c" | "f"&gt;("c");
+  provide(UnitsKey, { lengthUnit, tempUnit });
+  return { lengthUnit, tempUnit };
+}
+
+export function useUnits() {
+  const ctx = inject(UnitsKey);
+  if (!ctx) throw new Error("useUnits 必须在 provideUnits 之下使用");
+  return ctx;
+}
+
+// 顶层组件：provideUnits()
+// 深层组件：const { lengthUnit } = useUnits();
+//
+// 注意：Vue 里只有真正读了 lengthUnit.value 的组件才会重渲染，
+// 不像 React 那样所有 useContext 的消费者一起重渲染。</code></pre></div>
+  </div>
+
+  <div class="note note--trap">
+    <b>Context 的性能陷阱</b>
+    <p>Context 的 value 一变，<strong>所有</strong> <code>useContext</code> 的消费者都会重渲染，无论它们用到的是不是变化的那个字段。
+    所以：把变化频率不同的数据拆成不同的 Context；value 是对象时注意引用稳定；
+    需要细粒度订阅时上 Zustand / Jotai 这类状态库。Vue 的 <code>provide/inject</code> 因为传的是 ref，天然是细粒度的。</p>
+  </div>
+
+  <div class="tldr"><b>小结</b>
+    <ul>
+      <li>三种解法的优先级：props → 组合 → Context。</li>
+      <li>React 19 起 <code>&lt;Ctx value&gt;</code> 即可，不用写 <code>.Provider</code>。</li>
+      <li>用自定义 Hook 包装 <code>useContext</code>，把缺 Provider 变成清晰的错误。</li>
+      <li>Vue 的 <code>provide/inject</code> 传 ref，更新粒度天然更细。</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="pager" aria-label="章节翻页">
+  <a class="prev" href="ch16.html"><small>← 上一篇</small>数据获取与持久化</a>
+  <a class="next" href="ch18.html"><small>下一篇 →</small>Portal 跳出 DOM 层级</a>
+</nav>
+
+<footer>
+  <p>基于 chrisminnick/react-js-foundations 的 <code>book-code-listings/</code> 逐章重写<br>
+  原书：React JS Foundations · Chris Minnick · Wiley · ISBN 978-1-119-68554-8<br>
+  代码已更新至 React 19 / Vue 3.5 / TypeScript 5 / React Router 7 / Vite</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
